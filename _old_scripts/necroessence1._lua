@@ -1,0 +1,31 @@
+local itemid = 74772
+local itemm
+
+function Necroessence_OnGossipTalk(item, event, player)	
+	itemm = player:GetInventoryItemById(18707)
+	item:GossipCreateMenu(3545, player, 0)
+	item:GossipMenuAddItem(3, "Make my Use-spell Shadow Portal", 1, 0)
+	item:GossipMenuAddItem(3, "Print my spell id", 2, 0)
+	item:GossipMenuAddItem(3, "Print my spell trig", 3, 0)
+	item:GossipSendMenu(player)
+end
+
+function Necroessence_OnGossipSelect(item, event, player, id, intid, code, pMisc)
+	if(intid == 1) then
+		itemm:SetSpellId(0, 58538)
+		player:GossipComplete()
+	end
+
+	if(intid == 2) then
+		print(itemm:GetSpellId(0))
+		player:GossipComplete()
+	end
+
+	if(intid == 3) then
+		print(itemm:GetSpellTrigger(0))
+		player:GossipComplete()
+	end
+end
+
+RegisterItemGossipEvent(itemid, 1, "Necroessence_OnGossipTalk")
+RegisterItemGossipEvent(itemid, 2, "Necroessence_OnGossipSelect")

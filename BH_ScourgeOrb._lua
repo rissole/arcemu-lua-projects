@@ -1,0 +1,50 @@
+OBJECT_END = 0x006
+UNIT_FIELD_FLAGS = OBJECT_END + 0x0034
+UNIT_FLAG_NOT_ATTACKABLE_2 = 0x00000002
+_SCRYING_EVENT_IN_PROGRESS = false
+
+local spawnData = {
+ {82000021, 6712.370117, 3431.003174, 682.181580, 0.157862}, --nalzaphron = 1
+ {82000020, 6724.480469, 3433.183838, 582.195496, 3.268040}, --mezet = 2
+ {82000022, 6732.230957, 3425.125244, 682.268311, 2.824290}, --immo = 3
+ {82000023, 6732.643555, 3429.251709, 682.196838, 3.001005}, --plague-guy = 4
+ {82000024, 6732.596191, 3433.383789, 682.105774, 3.220916}, --thasval = 5
+ {82000025, 6731.173340, 3436.751465, 682.197571, 3.491879}  --keldram = 6
+}
+
+function ScryingOrb_ChatWithEmote(pUnit, chatType, msg)
+
+   pUnit:SendChatMessage(chatType, 0, msg)
+   pUnit:Emote(1, 1500)
+end
+
+function ScryingOrb_MarkQuest(player)
+   player:MarkQuestObjectiveAsComplete(8200018, 0)
+   _SCRYING_EVENT_IN_PROGRESS = false
+end
+
+function ScryingOrb_OnUse(pGo, event, player)
+   if (player:GetItemCount(82004) == 0) then
+      player:SendAreaTriggerMessage("|cFFFF0000You need Nalzaphron's Talisman to activate the orb.|r")
+   elseif (_SCRYING_EVENT_IN_PROGRESS == false) then
+      _SCRYING_EVENT_IN_PROGRESS = true
+      local spawnedUnits = {}
+      for i,v in ipairs(spawnData) do
+         local s = player:SpawnCreature(v[1], v[2], v[3], v[4], v[5], 14, 16000)
+         table.insert(spawnedUnits, s)
+      end
+      for i,v in ipairs(spawnedUnits) do
+         v:SetUInt32Value(UNIT_FIELD_FLAGS, UNIT_FLAG_NOT_ATTACKABLE_2)
+      end
+      RegisterTimedEvent("ScryingOrb_ChatWithEmote", 2000, 1, spawnedUnits[1], 12, "You shall be the guardian to the main key to my barrier. Do not fail me Mezet'nak!")
+      RegisterTimedEvent("ScryingOrb_ChatWithEmote", 5000, 1, spawnedUnits[2], 12, "I obey your will.")
+      RegisterTimedEvent("ScryingOrb_ChatWithEmote", 7000, 1, spawnedUnits[1], 12, "You four! Venerum! Keldram! Thasval! Immorus! You shall each carry a piece of the key as well. Protect it with the rest of your forsaken lives. For if you fail your torment shall know no bounds.")
+      for i=3,6 do
+         RegisterTimedEvent("ScryingOrb_ChatWithEmote", 12000, 1, spawnedUnits[i], 14, "May The Lich King's will be done!")
+      end
+      RegisterTimedEvent("ScryingOrb_ChatWithEmote", 14000, 1, spawnedUnits[1], 12, "Very well then, back to your posts!")
+      RegisterTimedEvent("ScryingOrb_MarkQuest", 16000, 1, player)
+   end
+end
+
+RegisterGameObjectEvent(80000002, 4, "ScryingOrb_OnUse")

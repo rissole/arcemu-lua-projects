@@ -1,0 +1,6 @@
+function Spawn_Circle(pUnit, event)
+   for i=1,8 do
+      pUnit:SpawnCreature(2572, pUnit:GetX()+60*10*(math.cos(i*40)*math.pi/180), pUnit:GetY()+60*10*(math.sin(i*40)*math.pi/180), pUnit:GetZ()+50, pUnit:GetO(), 35, 0);
+   end
+end
+RegisterUnitEvent(85701, 18, "Spawn_Circle")

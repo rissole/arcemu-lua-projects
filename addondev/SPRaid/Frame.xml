@@ -1,0 +1,154 @@
+﻿<Ui xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns="http://www.blizzard.com/wow/ui/">
+	<Script file="Frame.lua" />
+	<Frame name="SPRAIDFRAME" parent="UIParent" toplevel="true" movable="true" enableMouse="true">
+		<Size>
+			<AbsDimension x="331" y="154" />
+		</Size>
+		<Anchors>
+			<Anchor point="TOPLEFT">
+				<Offset>
+					<AbsDimension x="117" y="-47" />
+				</Offset>
+			</Anchor>
+		</Anchors>
+		<Scripts>
+			<OnMouseDown>self:StartMoving();</OnMouseDown>
+			<OnMouseUp>self:StopMovingOrSizing();</OnMouseUp>
+			<OnLoad>SPRAIDFRAME_OnLoad();</OnLoad>
+			<OnEvent>SPRAIDFRAME_OnEvent();</OnEvent>
+		</Scripts>
+		<Layers>
+			<Layer>
+				<FontString name="S_STREAK" inherits="GameFontNormalSmall">
+					<Size x="76" y="25" />
+					<Anchors>
+						<Anchor point="TOPLEFT">
+							<Offset x="218" y="-12" />
+						</Anchor>
+					</Anchors>
+				</FontString>
+				<FontString name="S_COUNT" inherits="GameFontNormalSmall">
+					<Size x="76" y="25" />
+					<Anchors>
+						<Anchor point="TOPLEFT">
+							<Offset x="15" y="-12" />
+						</Anchor>
+					</Anchors>
+				</FontString>
+				<FontString name="S_RESULTS" inherits="GameFontNormalLarge" text="Results">
+					<Size x="114" y="25" />
+					<Anchors>
+						<Anchor point="TOPLEFT">
+							<Offset x="101" y="-80" />
+						</Anchor>
+					</Anchors>
+				</FontString>
+				<FontString name="header" inherits="GameFontNormalLarge" text="SPRaid">
+					<Size x="118" y="33" />
+					<Anchors>
+						<Anchor point="TOPLEFT">
+							<Offset x="100" y="-12" />
+						</Anchor>
+					</Anchors>
+				</FontString>
+				<FontString name="S_YOU" inherits="GameFontNormalSmall" text="You">
+					<Size x="52" y="20" />
+					<Anchors>
+						<Anchor point="TOPLEFT">
+							<Offset x="27" y="-80" />
+						</Anchor>
+					</Anchors>
+				</FontString>
+				<FontString name="S_COMP" inherits="GameFontNormalSmall" text="Computer">
+					<Size x="76" y="20" />
+					<Anchors>
+						<Anchor point="TOPLEFT">
+							<Offset x="218" y="-81" />
+						</Anchor>
+					</Anchors>
+				</FontString>
+				<FontString name="PLAYERC" inherits="GameFontNormalLarge">
+					<Size x="86" y="37" />
+					<Anchors>
+						<Anchor point="TOPLEFT">
+							<Offset x="16" y="-104" />
+						</Anchor>
+					</Anchors>
+				</FontString>
+				<FontString name="COMPC" inherits="GameFontNormalLarge">
+					<Size x="92" y="36" />
+					<Anchors>
+						<Anchor point="TOPLEFT">
+							<Offset x="210" y="-104" />
+						</Anchor>
+					</Anchors>
+				</FontString>
+				<FontString name="S_OUTCOME" inherits="GameFontHighlightLarge">
+					<Size x="100" y="37" />
+					<Anchors>
+						<Anchor point="TOPLEFT">
+							<Offset x="106" y="-104" />
+						</Anchor>
+					</Anchors>
+				</FontString>
+			</Layer>
+		</Layers>
+		<Backdrop bgFile="Interface\DialogFrame\UI-DialogBox-Background" edgeFile="Interface\DialogFrame\UI-DialogBox-Border" tile="true">
+			<BackgroundInsets>
+				<AbsInset left="11" right="12" top="12" bottom="11" />
+			</BackgroundInsets>
+			<TileSize>
+				<AbsValue val="32" />
+			</TileSize>
+			<EdgeSize>
+				<AbsValue val="32" />
+			</EdgeSize>
+		</Backdrop>
+		<Frames>
+			<Button name="B_SCISSORS" inherits="UIPanelButtonTemplate" text="Scissors">
+				<Size x="76" y="38" />
+				<Anchors>
+					<Anchor point="TOPLEFT">
+						<Offset x="15" y="-43" />
+					</Anchor>
+				</Anchors>
+				<Scripts>
+					<OnClick>B_SCISSORS_OnClick();</OnClick>
+				</Scripts>
+			</Button>
+			<Button name="B_PAPER" inherits="UIPanelButtonTemplate" text="Paper">
+				<Size x="76" y="38" />
+				<Anchors>
+					<Anchor point="TOPLEFT">
+						<Offset x="120" y="-43" />
+					</Anchor>
+				</Anchors>
+				<Scripts>
+					<OnClick>B_PAPER_OnClick();</OnClick>
+				</Scripts>
+			</Button>
+			<Button name="B_ROCK" inherits="UIPanelButtonTemplate" text="Rock">
+				<Size x="76" y="38" />
+				<Anchors>
+					<Anchor point="TOPLEFT">
+						<Offset x="224" y="-44" />
+					</Anchor>
+				</Anchors>
+				<Scripts>
+					<OnClick>B_ROCK_OnClick();</OnClick>
+				</Scripts>
+			</Button>
+			<Button name="B_CLOSE" inherits="UIPanelButtonTemplate" text="X">
+				<Size x="21" y="20" />
+				<Anchors>
+					<Anchor point="TOPLEFT">
+						<Offset x="295" y="-12" />
+					</Anchor>
+				</Anchors>
+				<Scripts>
+					<OnClick>B_CLOSE_OnClick();</OnClick>
+				</Scripts>
+			</Button>
+		</Frames>
+	</Frame>
+</Ui>

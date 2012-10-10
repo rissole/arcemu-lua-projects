@@ -1,0 +1,51 @@
+-----------------------
+--Made by Hypersniper--
+-------wow-v.com-------
+--For Burning Heavens--
+-----------------------
+
+SHCKELEN = {}
+
+function SHCKELEN.OnCombat(pUnit, event, pAttacker)
+   pUnit:CastSpellOnTarget(52469, pAttacker) --infected bite
+   pUnit:RegisterEvent("SHCKELEN.InfectedBite", 12000, 0)
+   pUnit:RegisterEvent("SHCKELEN.Phase1", 1000, 0)
+end
+
+function SHCKELEN.Phase1(pUnit)
+   if (pUnit:GetHealthPct() <= 70) then
+      pUnit:RemoveEvents()
+      pUnit:RegisterEvent("SHCKELEN.InfectedBite", 12000, 0)
+      SHCKELEN.Roar(pUnit)
+      pUnit:RegisterEvent("SHCKELEN.Phase2", 1000, 0)
+   end
+end
+
+function SHCKELEN.Phase2(pUnit)
+   if (pUnit:GetHealthPct() <= 30) then
+      pUnit:RemoveEvents()
+      pUnit:RegisterEvent("SHCKELEN.InfectedBite", 12000, 0)
+      SHCKELEN.Roar(pUnit)
+   end
+end
+
+function SHCKELEN.InfectedBite(pUnit)
+   local mt = pUnit:GetMainTank()
+   if (mt == nil) then 
+      pUnit:RegisterEvent("SHCKELEN.InfectedBite", 500, 1)
+   else
+      pUnit:CastSpellOnTarget(52649, mt) --infected bite
+   end
+end
+
+function SHCKELEN.Roar(pUnit)
+   pUnit:CastSpell(22686) --bellowing roar
+end
+
+function SHCKELEN.removeEvents(pUnit)
+   pUnit:RemoveEvents()
+end
+
+RegisterUnitEvent(80000010, 1, "SHCKELEN.OnCombat")
+RegisterUnitEvent(80000010, 2, "SHCKELEN.removeEvents")
+RegisterUnitEvent(80000010, 4, "SHCKELEN.removeEvents")

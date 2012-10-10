@@ -1,0 +1,34 @@
+function Xavia_Summon_Totem(unit, event)
+	local chance = 1
+	local XX = xav:GetX()
+	local XY = xav:GetY()
+	local XZ = xav:GetZ()
+	local XO = xav:GetO()
+	if (chance == 1) then
+		air = xav:SpawnCreature(80, XX - 5, XY + 5, XZ, XO, 168, 0)
+		print(air)
+		Windy_Totem(air, event)
+	end
+	if (chance == 2) then
+		fire = xav:SpawnCreature(87004, XX + 5, XY + 5, XZ, XO, 168, 0)
+	end
+	if (chance == 3) then
+		water = xav:SpawnCreature(87003, XX - 5, XY - 5, XZ, XO, 168, 0)
+	end
+	if (chance == 4) then
+		earth = xav:SpawnCreature(87002, XX + 5, XY - 5, XZ, XO, 168, 0)
+	end
+end
+
+function Windy_Totem(unit, event)
+	print("Made it to windy totem")
+	local Players2 = air:GetInRangePlayers()
+	for i=1, #Players2 do
+		Players2[i]:SendAreaTriggerMessage("Xavia has spawned the Windy Totem!")
+	end
+	air:Root()
+	air:SetCombatMeleeCapable(1)
+	air:SetCombatTargetingCapable(1)
+	--air:RegisterEvent("Tornado_Spawn", 20000, 1)
+	air:Despawn(21000, 0)
+end

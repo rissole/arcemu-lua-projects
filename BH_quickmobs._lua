@@ -1,0 +1,50 @@
+-----------------------
+--Made by Hypersniper--
+-------wow-v.com-------
+--For Burning Heavens--
+-----------------------
+
+QUICKDEMONS = {}
+QUICKDEMONS.entry = {}
+QUICKDEMONS.entry.Felguard = 1 --entry ids
+QUICKDEMONS.entry.Succubus = 2
+QUICKDEMONS.entry.Devourer = 3
+QUICKDEMONS.entry.Imp = 4
+
+function QUICKDEMONS:OnCombat(pUnit)
+   if (pUnit:GetEntry() == self.entry.Felguard) then
+      pUnit:RegisterEvent("QUICKDEMONS.RavageArmor", 4000, 0)
+   elseif (pUnit:GetEntry() == self.entry.Succubus) then
+      pUnit:RegisterEvent("QUICKDEMONS.VoidStrike", 5000, 0)
+   elseif (pUnit:GetEntry() == self.entry.Devourer) then
+      pUnit:RegisterEvent("QUICKDEMONS.ManaBurn", 10000, 0)
+   elseif (pUnit:GetEntry() == self.entry.Imp) then
+      pUnit:RegisterEvent("QUICKDEMONS.FireBall", 2050, 0)
+   end
+end
+
+function QUICKDEMONS.RavageArmor(pUnit)
+   pUnit:CastSpellOnTarget(63615, pUnit:GetClosestPlayer())
+end
+
+function QUICKDEMONS.VoidStrike(pUnit)
+   pUnit:CastSpellOnTarget(52633, pUnit:GetClosestPlayer())
+end
+
+function QUICKDEMONS.ManaBurn(pUnit)
+   pUnit:CastSpellOnTarget(37159, pUnit:GetClosestPlayer())
+end
+
+function QUICKDEMONS.FireBall(pUnit)
+   pUnit:FullCastSpellOnTarget(24374, pUnit:GetClosestPlayer())
+end
+
+function QUICKDEMONS.removeEvents(pUnit)
+   pUnit:RemoveEvents()
+end
+
+for k,v in pairs(QUICKDEMONS.entry) do
+   RegisterUnitEvent(v, 1, "QUICKDEMONS:OnCombat")
+   RegisterUnitEvent(v, 2, "QUICKDEMONS.removeEvents")
+   RegisterUnitEvent(v, 4, "QUICKDEMONS.removeEvents")
+end

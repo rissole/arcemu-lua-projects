@@ -1,0 +1,44 @@
+-----------------------
+--Made by Hypersniper--
+-----Project Ronin-----
+-----------------------
+
+local nItem = 31994
+local PLAYER_FIELD_LIFETIME_HONORBALE_KILLS = 1228
+local PLAYER_FIELD_KILLS = 1225
+local STORAGE = {}
+
+function HonorScreen_OnUse(pItem, event, player)
+   STORAGE[player:GetName()] = STORAGE[player:GetName()] or {K="(None)", D="(None)"}
+   local h = {}
+   h.Total = player:GetTotalHonor()
+   h.Today = player:GetHonorToday()
+   h.Yesterday = player:GetHonorYesterday()
+   local k = {}
+   k.Total = player:GetUInt32Value(PLAYER_FIELD_LIFETIME_HONORBALE_KILLS)
+   local mixed = player:GetUInt32Value(PLAYER_FIELD_KILLS)
+   k.Today = bit_shiftright(bit_shiftleft(mixed, 16), 16)
+   k.Yesterday = bit_shiftright(mixed, 16)
+   pItem:GossipCreateMenu(18, player, 0)
+   pItem:GossipMenuAddItem(9, "|cFF660000Honor:|r", 0, 0)
+   for _, str in ipairs({"Total", "Today", "Yesterday"}) do
+      pItem:GossipMenuAddItem(0, str..": "..h[str], 0, 0)
+   end
+   pItem:GossipMenuAddItem(9, "|cFF660000Kills:|r", 0, 0)
+   for _, str in ipairs({"Total", "Today", "Yesterday"}) do
+      pItem:GossipMenuAddItem(0, str..": "..k[str], 0, 0)
+   end
+   pItem:GossipMenuAddItem(0, "|cFF660000Last killed:|r "..STORAGE[player:GetName()].K, 0, 0)
+   pItem:GossipMenuAddItem(0, "|cFF660000Last killer:|r "..STORAGE[player:GetName()].D, 0, 0)
+   pItem:GossipSendMenu(player)
+end
+
+function HonorScreen_OnHK(e, pKiller, pVictim)
+   STORAGE[pKiller:GetName()] = STORAGE[pKiller:GetName()] or {K="(None)", D="(None)"}
+   STORAGE[pVictim:GetName()] = STORAGE[pvictim:GetName()] or {K="(None)", D="(None)"}
+   STORAGE[pKiller:GetName()].K = pVictim:GetName()
+   STORAGE[pVictim:GetName()].D = pKiller:GetName()
+end
+
+RegisterItemGossipEvent(nItem, 1, HonorScreen_OnUse)
+RegisterServerHook(23, HonorScreen_OnHK)

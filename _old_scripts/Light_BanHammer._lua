@@ -1,0 +1,34 @@
+--[[
+'Light Banhammer' Lua script by Hypersniper.
+This contains Chance on hit behaviour for the item.
+Requires LuaHypArc, http://luahyparc.zapto.org/
+]]--
+
+local BANHAMMER_ENTRY = 77001
+local DUMMYSPELL_ENTRY = 0--11791
+
+function LightBanhammer_OnCastSpell(event, pPlayer,spellId)
+	print("LightBanhammer_OnCastSpell "..spellId)
+	if (spellId == DUMMYSPELL_ENTRY) then --if casting desired dummy spell
+		if (pPlayer:IsGm() == false) then --punish them if they're not a GM.
+			pPlayer:RemoveItem(BANHAMMER_ENTRY, pPlayer:GetItemCount(BANHAMMER_ENTRY))
+			pPlayer:SendAreaTriggerMessage("|cffFF0000This item is for GM use only.")
+			pPlayer:SendAreaTriggerMessage("|cffFF0000An Administrator will review this incident.")
+			pPlayer:SendBroadcastMessage("|cffFF0000This item is for GM use only.")
+			pPlayer:SendBroadcastMessage("|cffFF0000An Administrator will review this incident.")
+			logcol(4)
+			print(pPlayer:GetName().." has just illegally used item 'Light Banhammer'.")
+			pPlayer:KickPlayer(4000)
+		else	
+			pPlayer:PlayerSendChatMessage(1,0,"Rawr!")
+			local target = pPlayer:GetPrimaryCombatTarget()
+			if (target ~= 0) then --otherwise, kick your target!
+				if (target:IsPlayer()==true) then
+					target:KickPlayer(4000)
+				end
+			end
+		end
+	end
+end
+
+RegisterServerHook(10, "LightBanhammer_OnCastSpell")

@@ -1,0 +1,67 @@
+-----------------------
+--Made by Hypersniper--
+-------wow-v.com-------
+--For Burning Heavens--
+-----------------------
+
+MEZET = {}
+
+function MEZET.OnCombat(pUnit, event, pAttacker)
+   pUnit:RegisterEvent("MEZET.Phase1", 1000, 0)
+   pUnit:RegisterEvent("MEZET.ShredArmor", 15000, 0)
+   pUnit:RegisterEvent("MEZET.MortalSmash", 8000, 0)
+end
+
+function MEZET.doPhase(pUnit, next)
+   pUnit:RemoveEvents()
+   pUnit:CastSpell(53472) --pound
+   pUnit:RegisterEvent("MEZET.ShredArmor", 15000, 0)
+   pUnit:RegisterEvent("MEZET.MortalSmash", 8000, 0)
+   if (next ~= 0) then
+      pUnit:RegisterEvent("MEZET.Phase"..next, 1000, 0)
+   end
+end
+
+function MEZET.Phase1(pUnit)
+   if (pUnit:GetHealthPct() <= 70) then
+      MEZET.doPhase(pUnit, 2)
+   end
+end
+
+function MEZET.Phase2(pUnit)
+   if (pUnit:GetHealthPct() <= 40) then
+      MEZET.doPhase(pUnit, 3)
+   end
+end
+
+function MEZET.Phase3(pUnit)
+   if (pUnit:GetHealthPct() <= 10) then
+      MEZET.doPhase(pUnit, 0)
+   end
+end
+
+function MEZET.ShredArmor(pUnit)
+   local r = pUnit:GetMainTank()
+   if (r == nil) then
+      pUnit:RegisterEvent("MEZET.ShredArmor", 500, 1)
+   else
+      pUnit:CastSpellOnTarget(43243, r) --shred armor
+   end
+end
+
+function MEZET.MortalSmash(pUnit)
+   local r = pUnit:GetMainTank()
+   if (r == nil) then
+      pUnit:RegisterEvent("MEZET.MortalSmash", 500, 1)
+   else
+      pUnit:CastSpellOnTarget(61042, r) --mortal smash
+   end
+end
+
+function MEZET.removeEvents(pUnit)
+   pUnit:RemoveEvents()
+end
+
+RegisterUnitEvent(80000018, 1, "MEZET.OnCombat")
+RegisterUnitEvent(80000018, 2, "MEZET.removeEvents")
+RegisterUnitEvent(80000018, 4, "MEZET.removeEvents")

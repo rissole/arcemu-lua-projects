@@ -1,0 +1,6 @@
+## Interface: 33000
+## Title: Communicator
+## Notes: Extensible client-server communication.
+## Author: -
+## Version: 1.0
+comm.lua

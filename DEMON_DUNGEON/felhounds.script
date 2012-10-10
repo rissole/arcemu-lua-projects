@@ -1,0 +1,100 @@
+-----------------------
+--Made by Hypersniper--
+-----Project Ronin-----
+-----------------------
+
+local mod = getfenv(1)
+assert(type(mod) == "table", "RONIN_DUNGEON: Critical error, parent module missing!")
+module(mod._NAME..".FELHOUNDS", package.seeall)
+local self = getfenv(1)
+
+--entry ids
+local felpup = 25
+local makrah = 26
+local torian = 27
+
+local torian_path = { {973.01,560.15,210.48,4.37}, {973.51,542.38,210.34,4.34} }
+
+function DistToPoint(x,y,z,o,x2,y2,z2,o2)
+   local posTar = {x, y, z}
+   local posNow = {x2, y2, z2}
+   local distance = 0
+   for i,v in ipairs(posNow) do
+      distance = distance + (v-posTar[i])^2
+   end
+   return math.sqrt(distance) --yards
+end
+
+function TimeToPoint(x,y,z,o,x2,y2,z2,o2,speed)
+   local dist = DistToPoint(x,y,z,o,x2,y2,z2,o2)
+   return math.floor((dist / speed) * 1000)
+end
+
+function Makrah_OnSpawn(pUnit)
+   pUnit:RegisterEvent(Makrah_CheckPupsDead, 1000, 0)
+end
+
+function Torian_OnSpawn(pUnit)
+   pUnit:CastSpell(6820) --Corrupted Agility, Strength, and Stamina Passive
+   pUnit:CastSpell(6821)
+   pUnit:CastSpell(23245)
+end
+
+function Makrah_CheckPupsDead(pUnit)
+   for k,v in pairs(pUnit:GetInRangeUnits()) do
+      if (v:GetEntry() == felpup and v:IsAlive()) then
+         return
+      end
+   end
+   pUnit:AttackReaction(pUnit:GetClosestPlayer(), 1, 0)
+   pUnit:RemoveEvents()
+   local tor = mod.GetCreatureInRange(pUnit, torian)
+   tor:SendChatMessage(12, 0, "What is it girl? Something wrong?")
+   pUnit:RegisterEvent(Makrah_OnDie, 5000, 1)
+   pUnit:RegisterEvent(Makrah_3sPulse, 3000, 0)
+end
+
+function Makrah_3sPulse(pUnit)
+   local m = pUnit:GetMainTank()
+   pUnit:CastSpellOnTarget(34351, m) --vicious bite
+   if (pUnit:GetHealthPct() <= 80 and not self[tostring(pUnit)]) then
+      pUnit:CastSpell(30121) --howl
+      self[tostring(pUnit)] = true
+   end
+end
+
+function Makrah_OnDie(pUnit)
+   pUnit:RemoveEvents()
+   self[tostring(pUnit)] = nil
+   local tor = mod.GetCreatureInRange(pUnit, torian)
+   tor:SendChatMessage(12, 0, "What's going on out there?")
+   tor:SetMovementFlags(1)
+   local x1,y1,z1,o1 = tor:GetLocation()
+   local x,y,z,o = unpack(torian_path[1])
+   tor:RegisterEvent(Torian_PathGo, TimeToPoint(x1,y1,z1,o1, x, y, z, o, 8), 1)
+   tor:MoveTo(unpack(torian_path[1]))
+end
+
+function Makrah_OnLeaveCombat(pUnit)
+   pUnit:RemoveEvents()
+   self[tostring(pUnit)] = nil
+end
+
+function Torian_PathGo(pUnit)
+   local x1,y1,z1,o1 = pUnit:GetLocation()
+   local x,y,z,o = unpack(torian_path[2])
+   pUnit:RegisterEvent(Torian_PathEnd, TimeToPoint(x1,y1,z1,o1, x, y, z, o, 8), 1)
+   pUnit:MoveTo(unpack(torian_path[2]))
+end
+
+function Torian_PathEnd(pUnit)
+   pUnit:SendChatMessage(12, 0, "You! What have you done!?")
+   local p = pUnit:GetClosestPlayer()
+   if (not p) then return; end
+   pUnit:AttackReaction(p, 1, 0)
+end
+
+RegisterUnitEvent(makrah, 18, Makrah_OnSpawn)
+RegisterUnitEvent(makrah, 2, Makrah_OnLeaveCombat)
+RegisterUnitEvent(makrah, 4, Makrah_OnDie)
+RegisterUnitEvent(torian, 18, Torian_OnSpawn)

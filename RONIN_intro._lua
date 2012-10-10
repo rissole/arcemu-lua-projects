@@ -1,0 +1,127 @@
+-----------------------
+--Made by Hypersniper--
+-----Project Ronin-----
+-----------------------
+
+--[[
+   * Returns an array in reverse order from original
+--]]
+function table.reverse(t)
+   local ret = {};
+   local up = 1;
+   for i = #t, 1, -1 do
+      ret[up] = t[i];
+      up = up + 1;
+   end
+   return ret;
+end
+
+local nGari = 3001
+local gari_spawn = {1148.213745, -167.812866, 313.422150, 0.550232}
+local _INTRO_IN_PROGRESS = false
+local player_queue = {}
+INTRO_PATH = {
+   {1146.87,-165.56,313.19,2.98},
+   {1133.84,-159.77,312.16,2.67},
+   {1125.53,-149.71,312.48,2.04},
+   {1118.65,-135.67,314.23,2.01},
+   {1114.29,-121.12,315.62,1.83},
+   {1118.44,-102.11,315.30,1.89},
+   {1103.45,-88.19,315.07,2.39},
+   {1093.63,-68.89,318.33,2.06},
+   {1088.74,-59.60,319.28,2.06},
+   {1069.04,-23.13,318.57,2.09},
+   {1065.63,-16.77,317.25,2.11}
+}
+
+local Gari_Chats = {
+   [2] = "Anyway, this valley is home to one of the finest training camps in the world.",
+   [3] = "All new students are sent to Taro first. He'll do a general assessment of your abilities.",
+   [4] = "Your training regiment is adjusted depending on how you fare in his class.",
+   [5] = "It's a pretty open-ended program, so there's not much advice I can give you unfortunately!",
+   [6] = "As for me, well I'm part of Operation VII. We're the group that makes sure the world stays in balance and everyone stays safe.",
+   [7] = "That means we have to prohibit people from entering certain unsafe areas. Please try to understand that it's for your own safety.",
+   [8] = "Despite that, our contact with other people is limited so don't expect us to aid you with every problem.",
+   [9] = "If you have any questions I'm sure you can find the answer on your own. However, if you're really having trouble with something you can page an Operative and we'll help you as best as we can!",
+   [11] = "Well here we are!"
+}
+
+local function Chat(pUnit, message)
+   pUnit:Emote(1, 2000)
+   pUnit:SendChatMessage(12, 0, message)
+end
+
+function Intro_OnFirstEnterWorld(arg1, player, startfromqueue) --shared func... used for on first enter world as well as general start func
+   local gari = nil
+   if (not startfromqueue) then
+      for k,v in pairs(player:GetInRangeUnits()) do if (v:GetEntry() == nGari) then gari=v; end end
+      assert(gari, "Introduction: Fatal error, cannot find Gari!")
+      player:SetPlayerLock(1)
+      table.insert(player_queue, player)
+   else
+      gari = arg1
+   end
+   if (_INTRO_IN_PROGRESS == false or startfromqueue == true) then --no queue - go go!
+      _INTRO_IN_PROGRESS = true
+      gari:CreateLuaEvent(function() Chat(gari, "It's about time you got here! Had an uneventful trip I presume?") end, 5000, 1)
+      gari:CreateLuaEvent(function() Chat(gari, "Ah, well I'm here to introduce new recruits, not talk their ears off, so let's get going!") end, 10000, 1)
+      gari:CreateLuaEvent(function() Intro_GariBegin(gari) end, 15000, 1)
+   else --queue up
+      player:SendAreaTriggerMessage("Welcome! Please wait a moment for your escort")
+      player:SendBroadcastMessage("Welcome! Please wait a moment for your escort")
+   end
+end
+
+function Intro_Gari_OnNode(pa)
+   if (type(Gari_Chats[pa.currentNode]) == "string") then
+      Chat(pa.unit, Gari_Chats[pa.currentNode])
+   end
+   if (pa.currentNode == #pa.coords) then --end
+      pa.unit:CreateLuaEvent(function() Intro_GariEnd(pa.unit); end, 5000, 1)
+      local pl = pa.unit:GetClosestPlayer()
+      if (pl and pl:IsInWorld()) then
+         local x, y = pl:GetLocation()
+         pa.unit:SetFacing(pa.unit:CalcRadAngle(pa.unit:GetX(), pa.unit:GetY(), x, y))
+      end
+      return
+   end
+   pa:Continue()
+end
+
+function Intro_GariBegin(gari)
+   local pa = PathLib.Create(gari, 2.5, INTRO_PATH, Intro_Gari_OnNode);
+   pa:StartPath()
+   for i,v in ipairs(player_queue) do
+      if (v and v:IsInWorld()) then
+         local pb = PathLib.Create(v, 2.5, INTRO_PATH, function(p) if (p.currentNode ~= #p.coords-1) then p:Continue(); else p.unit:SetPlayerLock(0); end end)
+         gari:CreateLuaEvent(function() pb:StartPath(); end, 800*i, 1)
+      end
+   end
+   player_queue = {}
+end
+
+function Intro_GariEnd(gari)
+   Chat(gari, "I have to head back and greet any other new recruits. Head on over to the Dewdrop Inn there and meet Taro. Good luck!")
+   local function reverse_on_node(p)
+      if (p.currentNode == 3) then
+         p.unit:SetPosition(unpack(gari_spawn))
+         p.unit:SetFacing(gari_spawn[4])
+         p.unit:CastSpell(24222)
+         if (#player_queue > 0) then
+            Intro_OnFirstEnterWorld(p.unit, nil, true)
+         else
+            _INTRO_IN_PROGRESS = false
+         end
+      else
+         p:Continue()
+      end
+   end
+   local rev = table.reverse(INTRO_PATH)
+   table.remove(rev, 1)
+   local pa = PathLib.Create(gari, 2.5, rev, reverse_on_node);
+   pa:StartPath()
+end
+
+RegisterServerHook(3, Intro_OnFirstEnterWorld)
+RegisterUnitEvent(nGari, 18, function() return; end)
+RegisterServerHook(12, function(e,p) if (p:IsPacified() and not PLAYER_TAXI_DB[tostring(p)]) then return false; end end)

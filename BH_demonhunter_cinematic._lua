@@ -1,0 +1,291 @@
+-----------------------
+--Made by Hypersniper--
+-------wow-v.com-------
+--For Burning Heavens--
+-----------------------
+
+DHCINE1 = {}
+local _QUEST_ID = 55555 --quest that starts this
+--this quest must have the first objective as kill creature, use creature id 1.
+--also should require you turn in _BLINDFOLD_ID in order to receive the blue one.
+
+local _BLINDFOLD_ID = 63002 --the blindfold that gets added
+local _ILLI1_ID = 63000 --illidan - night elf form
+local _ILLI2_ID = 63001 --illidan - demon form
+local OBJECT_END = 0x0006
+local UNIT_NPC_FLAGS = OBJECT_END + 0x004C
+local UNIT_FIELD_BYTES_2 = OBJECT_END + 0x0074
+local UNIT_FIELD_FLAGS = OBJECT_END + 0x0034
+local UNIT_FLAG_NOT_SELECTABLE = 0x02000000
+
+local function GetDefaultNPCFlags(pUnit)
+   local res = WorldDBQuery("SELECT `npcflags` FROM `creature_proto` WHERE `entry`='"..pUnit:GetEntry().."'")
+   local col = res:GetColumn(0)
+   return col:GetLong()
+end
+
+--if illi/pUnit isnt there purposely, we put true as the arg.
+local function CHECK(pUnit, player, illiN, illiP)
+   if (not (pUnit and player and player:IsInWorld() and player:IsAlive() and illiN and illiP)) then
+      DHCINE1.End(pUnit, player, illiN, illiP)
+      return false
+   end
+   return true
+end
+
+--This all starts when you accept the quest.
+--pUnit = mentor
+function DHCINE1.Start(player, id, pUnit)
+   if (id ~= _QUEST_ID) then
+      return
+   end
+   player:SetPlayerLock(true)
+   pUnit:SendChatMessage(12, 0, "Alright. Brace yourself, "..player:GetName()..", this will not be an easy process.")
+   pUnit:SetUInt32Value(UNIT_NPC_FLAGS, 0)
+   pUnit:Emote(1, 1500)
+   RegisterTimedEvent("DHCINE1.Part1", 3000, 1, pUnit, player)
+end
+
+--Walks away to prepare fel dagger
+function DHCINE1.Part1(pUnit, player)
+   if (not CHECK(pUnit, player, true, true)) then return; end
+   pUnit:SetMovementFlags(0)
+   pUnit:SendChatMessage(12, 0, "In order to remove your sight I must prepare a dagger consumed in flames of Felfire. This is the only way.")
+   local x = pUnit:GetX()+math.cos(-pUnit:GetO()+math.pi) * 10
+   local y = pUnit:GetY()-math.sin(-pUnit:GetO()+math.pi) * 10
+   local z = pUnit:GetZ()--USE THIS: pUnit:GetLandHeight(x,y)
+   local posTar = {x, y, z, -pUnit:GetO()+math.pi}
+   local posNow = {pUnit:GetX(), pUnit:GetY(), pUnit:GetZ(), pUnit:GetO()}
+   local distance = 0
+   for i,v in ipairs(posNow) do
+      distance = distance + (v-posTar[i])^2
+   end
+   local t = math.floor(math.sqrt(distance)/2.5*1000)
+   pUnit:MoveTo(x, y, z, -pUnit:GetO()+math.pi)
+   RegisterTimedEvent("DHCINE1.Part2", t+500, 1, pUnit, player, posNow, t)
+end
+
+--Prepare dagger
+function DHCINE1.Part2(pUnit, player, posThen, t)
+   if (not CHECK(pUnit, player, true, true)) then return; end
+   pUnit:Emote(69, 8000)
+   pUnit:SendChatMessage(12, 0, "When your sight is bound many strange things may occur. Try your best to shut them out.")
+   RegisterTimedEvent("DHCINE1.Part2a", 4000, 1, pUnit, player)
+   RegisterTimedEvent("DHCINE1.Part3", 8500, 1, pUnit, player, posThen, t)
+end
+
+function DHCINE1.Part2a(pUnit, player)
+   if (not CHECK(pUnit, player, true, true)) then return; end
+   pUnit:SendChatMessage(12, 0, "Be prepared, for you shall feel immense pain.")
+end
+
+--Walk back
+function DHCINE1.Part3(pUnit, player, posThen, t)
+   if (not CHECK(pUnit, player, true, true)) then return; end
+   pUnit:EquipWeapons(32471, 0, 0)
+   pUnit:SetByteValue(UNIT_FIELD_BYTES_2, 0, 1) --unsheath
+   pUnit:MoveTo(posThen[1], posThen[2], posThen[3], posThen[4])
+   player:SetFacing(pUnit:CalcRadAngle(player:GetX(), player:GetY(), posThen[1], posThen[2]))
+   player:SetOrientation(pUnit:CalcRadAngle(player:GetX(), player:GetY(), posThen[1], posThen[2]))
+   pUnit:SendChatMessage(12, 0, "The dagger is ready.")
+   pUnit:Emote(1, 1500)
+   RegisterTimedEvent("DHCINE1.Part4", t+1000, 1, pUnit, player)
+end
+
+--Stab eye time
+function DHCINE1.Part4(pUnit, player)
+   if (not CHECK(pUnit, player, true, true)) then return; end
+   pUnit:SendChatMessage(14, 0, "May your left eye be ruined in order to carry out your wrath!")
+   pUnit:PlaySpellVisual(pUnit:GetGUID(), 0x54) --special attack anim on mentor
+   player:PlaySpellVisual(player:GetGUID(), 0x212) --blood spray eye on player
+   player:Emote(34) --emote wound critical
+   player:PlaySpellVisual(player:GetGUID(), 0x1c4c) --camera shake
+   RegisterTimedEvent("DHCINE1.FlickeringBlack", 200, 15, player, 60) --2s worth
+   RegisterTimedEvent("DHCINE1.Part5", 3000, 1, pUnit, player)
+end
+
+function DHCINE1.FlickeringBlack(player, percent)
+   if (not CHECK(true, player, true, true)) then return; end
+   if (math.random(100) <= percent) then
+      player:PlaySpellVisual(player:GetGUID(), 0x1c4c) --camera shake
+      player:PlaySpellVisual(player:GetGUID(), 0x14e) --flicker black
+   end
+end
+
+--Other eye time
+function DHCINE1.Part5(pUnit, player)
+   if (not CHECK(pUnit, player, true, true)) then return; end
+   pUnit:SendChatMessage(14, 0, "And may the right eye be ruined in order to carry out your vengeance!")
+   pUnit:PlaySpellVisual(pUnit:GetGUID(), 0x54) --special attack anim on mentor
+   player:PlaySpellVisual(player:GetGUID(), 0x212) --blood spray eye on player
+   player:Emote(34) --emote wound critical
+   player:PlaySpellVisual(player:GetGUID(), 0x1c4c) --camera shake
+   RegisterTimedEvent("DHCINE1.FlickeringBlack", 200, 15, player, 80) --3s worth
+   RegisterTimedEvent("DHCINE1.Part5a", 5000, 1, pUnit, player)
+end
+
+--give blindfold
+function DHCINE1.Part5a(pUnit, player)
+   if (not CHECK(pUnit, player, true, true)) then return; end
+   player:AddItem(_BLINDFOLD_ID, 1)
+   pUnit:SendChatMessage(12, 0, "Your sight is now lost. Don your blind fold Demon Hunter! See what really lies within our world!")
+   DHCINE1[tostring(player)] = pUnit --this basically used to say "in cinematic" and keep the mentor for use externally.
+   player:SetPlayerLock(false)
+   player:Root()
+   player:SetPacified(true)
+   RegisterTimedEvent("DHCINE1.End", 60000, 1, pUnit, player)
+end
+
+--premature ending
+function DHCINE1.End(pUnit, player, illiN, illiP)
+   if (pUnit and pUnit ~= true and pUnit:IsInWorld()) then
+      pUnit:SetUInt32Value(UNIT_NPC_FLAGS, GetDefaultNPCFlags(pUnit))
+      pUnit:SendChatMessage(12, 0, "We've lost one to the dream...")
+   end
+   if (player and player:IsInWorld() and player:IsAlive()) then
+      player:SetPlayerSpeed(7)
+      player:SetPlayerLock(false)
+      player:SetPacified(false)
+      player:Unroot()
+      player:RemoveAura(47740)
+      player:SetStandState(0)
+      DHCINE1[tostring(player)] = nil
+   end
+   if (illiN and illiN ~= true and illiN:IsInWorld()) then
+      illiN:Despawn(0,0)
+   end
+   if (illiP and illiP ~= true and illiP:IsInWorld()) then
+      illiP:Despawn(0,0)
+   end
+   RemoveTimedEvents()
+end
+
+--on equip blindfold
+function DHCINE1.BlindfoldDummy(eff, spell)
+   if (DHCINE1[tostring(spell:GetCaster())] ~= nil) then
+      RemoveTimedEvents()
+      DHCINE1.Part6(DHCINE1[tostring(spell:GetCaster())], spell:GetCaster())
+      DHCINE1[tostring(spell:GetCaster())] = nil
+   end
+end
+
+--struggle around
+function DHCINE1.Part6(pUnit, player)
+   if (not CHECK(pUnit, player, true, true)) then return; end
+   player:PlaySpellVisual(player:GetGUID(), 0x6E) --red hand roar
+   player:PlaySpellVisual(player:GetGUID(), 0x1c4c) --camera shake
+   RegisterTimedEvent("DHCINE1.Part7", 2000, 1, pUnit, player)
+end
+
+--fake die
+function DHCINE1.Part7(pUnit, player)
+   if (not CHECK(pUnit, player, true, true)) then return; end
+   player:SetStandState(7) --"dead"
+   RegisterTimedEvent("DHCINE1.Part7a", 2000, 1, pUnit, player)
+end
+
+--quick chat
+function DHCINE1.Part7a(pUnit, player)
+   if (not CHECK(pUnit, player, true, true)) then return; end
+   pUnit:SendChatMessage(12, 0, "So it begins...")
+   RegisterTimedEvent("DHCINE1.Part8", 2000, 1, pUnit, player)
+end
+
+--enter dream
+function DHCINE1.Part8(pUnit, player)
+   if (not CHECK(pUnit, player, true, true)) then return; end
+   pUnit:EquipWeapons(0,0,0)
+   SetDBCSpellVar(47740, "c_is_flags", 0x01000) --forces world of shadows as debuff, ie unremovable, spell editing ftw
+   player:CastSpell(47740) --world of shadows
+   player:SetStandState(0) --alive
+   player:CastSpell(64394) --"get up" emote
+   player:Unroot()
+   player:SetPlayerSpeed(1)
+   local illiNoob = player:SpawnCreature(_ILLI1_ID, pUnit:GetX(), pUnit:GetY(), pUnit:GetZ(), pUnit:GetO(), 35, 0, 0, 0, 0, 32)
+   local x = pUnit:GetX()+math.cos(-illiNoob:GetO()+math.pi) * 4
+   local y = pUnit:GetY()-math.sin(-illiNoob:GetO()+math.pi) * 4
+   local z = pUnit:GetZ() --USE THIS: pUnit:GetLandHeight(x,y)
+   local illiPro = player:SpawnCreature(_ILLI2_ID, x, y, z, pUnit:GetO(), 35, 0, 0, 0, 0, 32)
+   RegisterTimedEvent("DHCINE1.IlliProVisualDelay", 500, 1, illiPro)
+   RegisterTimedEvent("DHCINE1.Part9", 2000, 1, pUnit, player, illiNoob, illiPro)
+   illiPro:SetUInt32Value(UNIT_FIELD_FLAGS, UNIT_FLAG_NOT_SELECTABLE)
+end
+
+function DHCINE1.IlliProVisualDelay(pUnit)
+   pUnit:CastSpell(22650) --ghostly visual
+   pUnit:SetScale(2)
+end
+
+--chats time
+function DHCINE1.Part9(pUnit, player, illiN, illiP)
+   if (not CHECK(pUnit, player, illiN, illiP)) then return; end
+   illiN:SendChatMessage(12, 0, "Greetings, "..player:GetName()..".")
+   illiN:Emote(1, 1500)
+   RegisterTimedEvent("DHCINE1.IllisChat", 4000, 1, pUnit, player, illiN, illiP, "You may know me as Illidan, the Betrayer.")
+   RegisterTimedEvent("DHCINE1.IllisChat", 8000, 1, pUnit, player, illiN, illiP, "But I was once just like you.", "point")
+   RegisterTimedEvent("DHCINE1.IllisChat", 12000, 1, pUnit, player, illiN, illiP, "An eager student, ready to learn more...")
+   RegisterTimedEvent("DHCINE1.IllisChat", 14000, 1, pUnit, player, illiN, illiP, "Do more...")
+   RegisterTimedEvent("DHCINE1.IllisChat", 16000, 1, pUnit, player, illiN, illiP, "See more...")
+   RegisterTimedEvent("DHCINE1.IllisChat", 19000, 1, pUnit, player, illiN, illiP, "I was never blessed with a mentor, "..player:GetName().."...")
+   RegisterTimedEvent("DHCINE1.IllisChat", 23000, 1, pUnit, player, illiN, illiP, "My vision was bound by Sargeras.")
+   RegisterTimedEvent("DHCINE1.IllisChat", 27000, 1, pUnit, player, illiN, illiP, "It's too bad that my soul wasn't untouched by the binding...")
+   RegisterTimedEvent("DHCINE1.IllisChat", 31000, 1, pUnit, player, illiN, illiP, "But then again, whose isn't?")
+   RegisterTimedEvent("DHCINE1.IllisChat", 34000, 1, pUnit, player, illiN, illiP, "You will never be the same after this, "..player:GetName()..".")
+   RegisterTimedEvent("DHCINE1.IllisChat", 37000, 1, pUnit, player, illiN, illiP, "Never the same again!", "end1")
+   RegisterTimedEvent("DHCINE1.IllisChat", 40000, 1, pUnit, player, illiN, illiP, nil, "end")
+end
+
+function DHCINE1.IllisChat(pUnit, player, illiN, illiP, message, ex)
+   if (not CHECK(pUnit, player, illiN, illiP)) then return; end
+   if (ex == "end1") then
+      illiN:SendChatMessage(14, 0, message)
+   elseif (message ~= nil) then
+      illiN:SendChatMessage(12, 0, message)
+      if (ex ~= "point") then illiN:Emote(1, 1500); end
+   end
+   if (math.random(100) <= 50 and ex ~= "end") then illiP:Emote(15, 3000); end
+   if (ex == "point") then
+      illiN:SetFacing(illiN:CalcRadAngle(illiN:GetX(), illiN:GetY(), player:GetX(), player:GetY()))
+      illiN:Emote(25, 3000)
+   end
+   if (ex == "end") then
+      illiN:SetModel(21322) --demon form time boys
+      illiN:SetScale(0.6)
+      illiP:Despawn(0,0)
+      illiN:Emote(5, 2000)
+      RegisterTimedEvent("DHCINE1.Part10", 500, 1, pUnit, player, illiN)
+   end
+end
+
+--sprint away
+function DHCINE1.Part10(pUnit, player, illi)
+   if (not CHECK(pUnit, player, illi, true)) then return; end
+   local x = pUnit:GetX()+math.cos(-illi:GetSpawnO()+math.pi) * 50000
+   local y = pUnit:GetY()-math.sin(-illi:GetSpawnO()+math.pi) * 50000
+   local z = pUnit:GetZ() --USE THIS: pUnit:GetLandHeight(x,y)
+   player:PlaySoundToPlayer(11965)
+   illi:ModifyWalkSpeed(200)
+   illi:MoveTo(x,y,z,0)
+   RegisterTimedEvent("DHCINE1.Part11", 3000, 1, pUnit, player, illi)
+end
+
+--ending
+function DHCINE1.Part11(pUnit, player, illi)
+   if (not CHECK(pUnit, player, illi, true)) then return; end
+   illi:Despawn(0,0)
+   player:SetPlayerSpeed(7)
+   player:RemoveAura(47740) --remove world of shadows
+   pUnit:SetUInt32Value(UNIT_NPC_FLAGS, GetDefaultNPCFlags(pUnit))
+   if (player:HasQuest(_QUEST_ID)) then --should always be true unless they abandon
+      player:MarkQuestObjectiveAsComplete(_QUEST_ID, 0)
+   end
+   player:SetPacified(false)
+   RegisterTimedEvent("DHCINE1.Part12", 2000, 1, pUnit)
+end
+
+function DHCINE1.Part12(pUnit)
+   pUnit:SendChatMessage(12, 0, "You made it back... Amazing.")
+end
+
+RegisterServerHook(14, "DHCINE1.Start")
+RegisterDummySpell(30660, "DHCINE1.BlindfoldDummy")

@@ -1,0 +1,150 @@
+GateDefender = {}
+
+local Defender1 = 41
+local Defender2 = 42
+local Defender3 = 43
+local Defender4 = 44
+
+local Archer1 = 45
+local Archer2 = 46
+local Archer3 = 47
+local Archer4 = 48
+
+local Cleric1 = 49
+local Cleric2 = 50
+
+function GateDefender.Defender1_OnSpawn(Unit, Event)
+Unit:RegisterEvent("GateDefender.ThreatPulse", 1000, 1)
+GateDefender[1] = Unit
+end
+
+function GateDefender.Defender2_OnSpawn(Unit, Event)
+Unit:RegisterEvent("GateDefender.ThreatPulse", 1000, 1)
+GateDefender[2] = Unit
+end
+
+function GateDefender.Defender3_OnSpawn(Unit, Event)
+Unit:RegisterEvent("GateDefender.ThreatPulse", 1000, 1)
+GateDefender[3] = Unit
+end
+
+function GateDefender.Defender4_OnSpawn(Unit, Event)
+Unit:RegisterEvent("GateDefender.ThreatPulse", 1000, 1)
+GateDefender[4] = Unit
+end
+
+function GateDefender.Archer1_OnSpawn(Unit, Event)
+GateDefender[5] = Unit
+end
+
+function GateDefender.Archer2_OnSpawn(Unit, Event)
+GateDefender[6] = Unit
+end
+
+function GateDefender.Archer3_OnSpawn(Unit, Event)
+GateDefender[7] = Unit
+end
+
+function GateDefender.Archer4_OnSpawn(Unit, Event)
+GateDefender[8] = Unit
+end
+
+function GateDefender.Cleric1_OnSpawn(Unit, Event)
+Unit:SetCombatCapable(1)
+Unit:RegisterEvent("GateDefender.HealthCheck1", 1000, 0)
+GateDefender[9] = Unit
+end
+
+function GateDefender.Cleric2_OnSpawn(Unit, Event)
+Unit:SetCombatCapable(1)
+Unit:RegisterEvent("GateDefender.HealthCheck2", 1000, 0)
+GateDefender[10] = Unit
+end
+
+function GateDefender.ThreatPulse(Unit, Event)
+Unit:CastSpell(58110)
+end
+
+function GateDefender.Defender_OnCombat(Unit, Event)
+Unit:RegisterEvent("GateDefender.SlowShout", 30000, 0)
+Unit:RegisterEvent("GateDefender.Whirl", 8000, 0)
+end
+
+function GateDefender.SlowShout(Unit, Event)
+Unit:CastSpell(74781)
+end
+
+function GateDefender.Whirl(Unit, Event)
+Unit:CastSpell(63785)
+end
+
+function GateDefender.Archer_OnCombat(Unit, Event, pMisc)
+RegisterTimedEvent("GateDefender.ReduceThreat", 10000, 0, Unit, pMisc)
+end
+
+function GateDefender.ReduceThreat(Unit, pMisc)
+Unit:CastSpellOnTarget(38328, pMisc)
+end
+
+function GateDefender.HealthCheck1(Unit, Event)
+	if (Unit:GetCurrentSpellId() ~= nil) then return; end
+	if (GateDefender[1]:GetHealthPct() < 40 and GateDefender[1]:IsAlive()) then
+		Unit:FullCastSpellOnTarget(5188, GateDefender[1])
+	end
+	if (GateDefender[2]:GetHealthPct() < 40 and GateDefender[2]:IsAlive()) then
+		Unit:FullCastSpellOnTarget(5188, GateDefender[2])
+	end
+end
+
+function GateDefender.HealthCheck2(Unit, Event)
+	if (Unit:GetCurrentSpellId() ~= nil) then return; end
+	if (GateDefender[3]:GetHealthPct() < 50 and GateDefender[3]:IsAlive()) then
+			Unit:FullCastSpellOnTarget(5188, GateDefender[3])
+	end
+	if (GateDefender[4]:GetHealthPct() < 50 and GateDefender[4]:IsAlive()) then
+			Unit:FullCastSpellOnTarget(5188, GateDefender[4])
+	end
+end
+
+function GateDefender.OnLeaveCombat(Unit, Event)
+Unit:RemoveEvents()
+RemoveTimedEventsInTable("GateDefender")
+end
+
+--OnSpawn
+RegisterUnitEvent(Defender1, 18, "GateDefender.Defender1_OnSpawn")
+RegisterUnitEvent(Defender2, 18, "GateDefender.Defender2_OnSpawn")
+RegisterUnitEvent(Defender3, 18, "GateDefender.Defender3_OnSpawn")
+RegisterUnitEvent(Defender4, 18, "GateDefender.Defender4_OnSpawn")
+
+RegisterUnitEvent(Archer1, 18, "GateDefender.Archer1_OnSpawn")
+RegisterUnitEvent(Archer2, 18, "GateDefender.Archer2_OnSpawn")
+RegisterUnitEvent(Archer3, 18, "GateDefender.Archer3_OnSpawn")
+RegisterUnitEvent(Archer4, 18, "GateDefender.Archer4_OnSpawn")
+
+RegisterUnitEvent(Cleric1, 18, "GateDefender.Cleric1_OnSpawn")
+RegisterUnitEvent(Cleric2, 18, "GateDefender.Cleric2_OnSpawn")
+
+--OnCombat
+RegisterUnitEvent(Defender1, 1, "GateDefender.Defender_OnCombat")
+RegisterUnitEvent(Defender2, 1, "GateDefender.Defender_OnCombat")
+RegisterUnitEvent(Defender3, 1, "GateDefender.Defender_OnCombat")
+RegisterUnitEvent(Defender4, 1, "GateDefender.Defender_OnCombat")
+
+RegisterUnitEvent(Archer1, 1, "GateDefender.Archer_OnCombat")
+RegisterUnitEvent(Archer2, 1, "GateDefender.Archer_OnCombat")
+RegisterUnitEvent(Archer3, 1, "GateDefender.Archer_OnCombat")
+RegisterUnitEvent(Archer4, 1, "GateDefender.Archer_OnCombat")
+
+--OnLeaveCombat
+for i,v in ipairs({2,4}) do
+	RegisterUnitEvent(Defender1, v, "GateDefender.OnLeaveCombat")
+	RegisterUnitEvent(Defender2, v, "GateDefender.OnLeaveCombat")
+	RegisterUnitEvent(Defender3, v, "GateDefender.OnLeaveCombat")
+	RegisterUnitEvent(Defender4, v, "GateDefender.OnLeaveCombat")
+
+	RegisterUnitEvent(Archer1, v, "GateDefender.OnLeaveCombat")
+	RegisterUnitEvent(Archer2, v, "GateDefender.OnLeaveCombat")
+	RegisterUnitEvent(Archer3, v, "GateDefender.OnLeaveCombat")
+	RegisterUnitEvent(Archer4, v, "GateDefender.OnLeaveCombat")
+end

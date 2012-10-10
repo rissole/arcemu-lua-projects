@@ -1,0 +1,65 @@
+-----------------------
+--Made by Hypersniper--
+-----Project Ronin-----
+-----------------------
+
+--Non-Player Guilds
+--Add the info into the npguild_info table as directed
+--Also added an @@ command to add NPGs for you, see below.
+
+local npguild_info = {
+  --[npc_entry] = {guildId, npc_text_id},
+  [481] = {10, 50000}
+}
+
+local function mysql_real_escape_string(str)
+   str = str:gsub("\x00", "\\x00")
+   str = str:gsub("\n", "\\n")
+   str = str:gsub("\r", "\\r")
+   str = str:gsub("\\", "\\\\")
+   str = str:gsub("'", "\\'")
+   str = str:gsub("\"", "\\\"")
+   str = str:gsub("\x1a", "\\x1a")
+   return str
+end
+
+--In-game function to create the shell of a non-player guild.
+--It's ID is auto-incremented from the existing guilds, so you don't need to provide one.
+--Just run the command below, then restart the server, and you're good to go.
+--@@ CreateNPG("name_here")
+function CreateNPG(name)
+   assert(type(name) == "string", "CreateNPG error: argument 1 expected a string, got "..type(name))
+   assert(GetGuildByName(name) ~= -1, "CreateNPG error: guild \""..name.."\" already exists!")
+   name = mysql_real_escape_string(name)
+   CharDBQuery(string.format("INSERT INTO guilds (guildName, createdate, bankBalance) VALUES (%q, 0, 0)", name))
+   local g_id = CharDBQuery(string.format("SELECT guildId FROM guilds WHERE guildName = %q", name)):GetColumn(0):GetULong()
+   CharDBQuery(string.format("INSERT INTO guild_ranks (guildId, rankId, rankName, rankRights) VALUES (%d, 0, 'Guild Master', 913919)", g_id))
+   CharDBQuery(string.format("INSERT INTO guild_ranks (guildId, rankId, rankName, rankRights) VALUES (%d, 1, 'Member', 67)", g_id))
+   CharDBQuery(string.format("INSERT INTO guild_data VALUES (%d, 0, 0, '', '', 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)", g_id))
+end
+
+function NPGuild_OnGossip(pUnit, event, player)
+   local textid = npguild_info[pUnit:GetEntry()][2]
+   pUnit:GossipCreateMenu(textid, player, 0)
+   if (player:IsInGuild()) then
+      pUnit:GossipMenuAddItem(0, "I'm already in a guild.", 1, 0)
+   else
+      pUnit:GossipMenuAddItem(0, "Definitely, sign me up!", 2, 0)
+   end
+   pUnit:GossipSendMenu(player)
+end
+
+function NPGuild_OnGossipSel(pUnit, event, player, id, intid, code)
+   if (intid == 1) then
+      player:GossipComplete()
+   elseif (intid == 2) then
+      local guildId = npguild_info[pUnit:GetEntry()][1]
+      player:AddGuildMember(guildId)
+      player:GossipComplete()
+   end
+end
+
+for k,v in pairs(npguild_info) do
+   RegisterUnitGossipEvent(k, 1, NPGuild_OnGossip)
+   RegisterUnitGossipEvent(k, 2, NPGuild_OnGossipSel)
+end

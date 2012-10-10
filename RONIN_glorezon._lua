@@ -1,0 +1,97 @@
+-----------------------
+--Made by Hypersniper--
+-----Project Ronin-----
+-----------------------
+
+GLOREZON = {}
+GLOREZON.entry = 196
+GLOREZON.v1 = {2767.11, -2966.94, 144.60, 5.61} --spawn vec
+GLOREZON.v2 = {2780.75, -2977.30, 148.44, 5.59} --walk to vec
+GLOREZON.AxeEntry = 198
+GLOREZON.AxeVec = {2787.51, -2982.2, 157.815, 5.64095}
+
+local function FaceUnit(u, p)
+   if (not u or not p) then return; end
+   u:SetFacing(u:CalcRadAngle(u:GetX(), u:GetY(), p:GetX(), p:GetY()))
+end
+
+function GLOREZON.OnSpawn(pUnit)
+   pUnit:RegisterEvent(GLOREZON.StartEvent, 10 * 60 * 1000, 0)
+end
+
+function GLOREZON.StartEvent(pUnit)
+   local e = math.random(194, 195) --ACOLYTE ENTRIES
+   local x, y, z, o = unpack(GLOREZON.v1)
+   local u = pUnit:SpawnCreature(e, x, y, z, o, 14, 0)
+   GLOREZON.Aco = u --only one of this event happening in the world
+   u:SetUInt32Value(UNIT_FIELD_FLAGS, UNIT_FLAG_NOT_ATTACKABLE_2)
+   u:SetCombatCapable(1)
+   u:ModifyRunSpeed(2.5)
+   local x2, y2, z2, o2 = unpack(GLOREZON.v2)
+   u:MoveTo(x2, y2, z2, o2)
+   local t = PathLib._TimeToPoint(x, y, z, o, x2, y2, z2, o2, 2.5)
+   pUnit:CreateLuaEvent(function() GLOREZON.AcoArrive(u, pUnit) end, t, 1)
+end
+
+function GLOREZON.AcoArrive(pUnit, pGlor)
+   pUnit:SetUInt32Value(UNIT_NPC_EMOTESTATE, 398)
+   local function kill()
+      FaceUnit(pGlor, pUnit)
+      pGlor:CastSpellOnTarget(41080, pUnit)
+      pGlor:Kill(pUnit)
+      GLOREZON.Aco = nil
+      pGlor:RegisterEvent(GLOREZON.PostAcoDeath, 3000, 1)
+   end
+   pGlor:CreateLuaEvent(kill, 3000, 1)
+end
+
+function GLOREZON.PostAcoDeath(pUnit)
+   pUnit:SetFacing(GLOREZON.v2[4])
+   for k,v in pairs(pUnit:GetInRangeUnits()) do
+      if (v:GetEntry() == GLOREZON.AxeEntry) then --AXE ENTRY
+         GLOREZON.Axe = v
+      end
+   end
+   GLOREZON.Axe:ChannelSpell(39123, pUnit)
+   local function stopchannel()
+      GLOREZON.Axe:StopChannel()
+      GLOREZON.AxeOnSpawn(GLOREZON.Axe)
+   end
+   GLOREZON.Axe:CreateLuaEvent(stopchannel, 3000, 1)
+end
+
+function GLOREZON.EnterCombat(pUnit)
+   pUnit:RemoveEvents()
+   pUnit:EquipWeapons(30715, 30715, 0)
+   if (GLOREZON.Aco ~= nil) then
+      GLOREZON.Aco:RemoveEvents()
+      GLOREZON.Aco:Despawn(1, 0)
+      GLOREZON.Aco = nil
+   end
+   if (GLOREZON.Axe ~= nil) then
+      GLOREZON.Axe:StopChannel()
+      GLOREZON.Axe:RemoveEvents()
+      GLOREZON.Axe:Despawn(1, 0)
+      GLOREZON.Axe = nil
+   end
+end
+
+function GLOREZON.End(pUnit, event)
+   pUnit:EquipWeapons(0, 0, 0)
+   local x, y, z, o = unpack(GLOREZON.AxeVec)
+   pUnit:SpawnCreature(GLOREZON.AxeEntry, x, y, z, o, 35, 0)
+   if (event == 2) then GLOREZON.Spawn(pUnit); end
+end
+
+function GLOREZON.AxeOnSpawn(pUnit)
+   pUnit:SetUInt32Value(UNIT_FIELD_FLAGS, UNIT_FLAG_NOT_SELECTABLE)
+   pUnit:SetUInt32Value(UNIT_NPC_EMOTESTATE, 383)
+   pUnit:SetByteValue(UNIT_FIELD_BYTES_1, 0, 1)
+   pUnit:EquipWeapons(34080, 34080, 0)
+end
+
+RegisterUnitEvent(GLOREZON.entry, 18, GLOREZON.OnSpawn)
+RegisterUnitEvent(GLOREZON.entry, 1, GLOREZON.EnterCombat)
+RegisterUnitEvent(GLOREZON.AxeEntry, 18, GLOREZON.AxeOnSpawn)
+RegisterUnitEvent(GLOREZON.entry, 2, GLOREZON.End)
+RegisterUnitEvent(GLOREZON.entry, 4, GLOREZON.End)

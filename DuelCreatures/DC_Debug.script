@@ -1,0 +1,82 @@
+-----------------------
+--Made by Hypersniper--
+----Duel Creatures-----
+-----------------------
+
+--Debug
+
+local par = getfenv(1)
+assert(type(par) == "table", "DuelCreatures: Critical error, parent module missing!")
+module(par._NAME..".DEBUG", package.seeall)
+local self = getfenv(1)
+setmetatable(self, {__index = par.SHARED})
+_G.dcd = self
+
+function printhand()
+   assert(PLR)
+   local index, nCon = GetDuelIndex(PLR:GetName())
+   if (not index) then SendMsg(PLR, "|cFF00FF00Not in a duel."); return; end
+   if (nCon) then nCon = 1; else nCon = 2; end
+   for i,v in ipairs(CONSOLES[index][nCon][5]) do
+      print(i,v)
+   end
+end
+
+function printdeck()
+   assert(PLR)
+   local index, nCon = GetDuelIndex(PLR:GetName())
+   if (not index) then SendMsg(PLR, "|cFF00FF00Not in a duel."); return; end
+   if (nCon) then nCon = 1; else nCon = 2; end
+   for i,v in ipairs(CONSOLES[index][nCon][3]) do
+      print(i,v)
+   end
+end
+
+function printbacks()
+   assert(PLR)
+   local index, nCon = GetDuelIndex(PLR:GetName())
+   if (not index) then SendMsg(PLR, "|cFF00FF00Not in a duel."); return; end
+   if (nCon) then nCon = 1; else nCon = 2; end
+   for i,v in ipairs(CONSOLES[index][nCon][7]) do
+      print(i,v)
+   end
+end
+
+function printtable(t)
+   for i,v in ipairs(t) do
+      print(i,v)
+   end
+end
+
+function challenge(name)
+   assert(PLR)
+   par.MANAGER.OnGossipSel(PLR, 2, PLR, 0, 30, name)
+end
+
+function popgy()
+   assert(PLR)
+   local index, nCon = GetDuelIndex(PLR:GetName())
+   if (not index) then SendMsg(PLR, "|cFF00FF00Not in a duel."); return; end
+   if (nCon) then nCon = 1; else nCon = 2; end
+   for i=1,5 do
+      table.insert(CONSOLES[index][nCon][6], 1)
+   end
+end
+
+function offerchoice()
+   assert(PLR)
+   local index, nCon = GetDuelIndex(PLR:GetName())
+   if (not index) then SendMsg(PLR, "|cFF00FF00Not in a duel."); return; end
+   if (nCon) then nCon = 1; else nCon = 2; end
+   popgy()
+   local function final(sender,player,choices) for i,v in ipairs(choices) do print(i,v) end end
+   OfferChoice(CONSOLES[index][nCon][1], PLR, 1, "graveyard", {}, 3, final)
+end
+
+function summonmonster(dcid, slot)
+   assert(PLR)
+   local index, nCon = GetDuelIndex(PLR:GetName())
+   if (not index) then SendMsg(PLR, "|cFF00FF00Not in a duel."); return; end
+   if (nCon) then nCon = 1; else nCon = 2; end
+   par.FIELD.SummonMonster(index, nCon, slot, dcid)
+end

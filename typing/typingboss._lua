@@ -1,0 +1,159 @@
+TYPING = {current = {}, words={}}
+local BossID = 74801
+local MgrID = 74802
+
+math.randomseed(os.time()); math.random(); math.random(); math.random();
+
+TYPING.SplannoMessages = {
+ "The challenge is simple: type the words within the time limit.",
+ "Fail, and die.",
+ "Alright, let's begin!"
+}
+
+local function GetBoss(p)
+   for k,v in pairs(p:GetInRangeUnits()) do
+      if (v:GetEntry() == BossID) then
+         return v
+      end
+   end
+   return nil
+end
+
+local function AreAllDead(p)
+   if (p:IsInGroup()) then
+      for k,v in pairs(p:GetGroupPlayers()) do
+         if (v:IsAlive()) then return true; end
+      end
+      return false
+   else
+      return p:IsDead()
+   end
+end
+
+--text file 1 word per line
+function TYPING.LoadWords(fname)
+   local f = assert(io.open(fname, "r"), "non-existent word file")
+   local text = f:read("*all")
+   string.gsub(text, "(%w+)\n", function(c) table.insert(TYPING.words,c) end)
+   f:close()
+end
+
+function TYPING.BossLoad(pUnit)
+   pUnit:SetUInt32Value(UNIT_FIELD_FLAGS, UNIT_FLAG_NOT_ATTACKABLE_2)
+   TYPING.LoadWords("scripts/typing/words.txt")
+end
+
+function TYPING.MgrGossip(pUnit, event, player)
+   pUnit:GossipCreateMenu(65536, player, 0)
+   pUnit:GossipMenuAddItem(0, "I challenge the Mastermind to a battle!", 1, 0)
+   pUnit:GossipMenuAddItem(0, "Erm, I might go read a few books first...", 2, 0)
+   pUnit:GossipSendMenu(player)
+end
+
+function TYPING.MgrGossip2(pUnit, e, player, i, intid, c)
+   if (intid == 1) then
+      -- Do LinkExists here!
+      pUnit:SendChatMessage(12, 0, "Very well. Solarwrench, you're up!")
+      CreateLuaEvent(function() TYPING.SplannoBegin(player) end, 4000, 1)
+   elseif (intid == 2) then
+      player:GossipComplete()
+   end
+end
+
+function TYPING.SplannoBegin(player)
+   local pUnit = GetBoss(player)
+   pUnit:SendChatMessage(12, 0, "Finally a challenge... It gets very boring around here, you know.")
+   for i=1, #TYPING.SplannoMessages do
+      pUnit:CreateLuaEvent(function() TYPING.BigMsg(pUnit, i) end, i*4000, 1)
+   end
+   pUnit:CreateLuaEvent(function() TYPING.NewWordGo(pUnit, player) end, (#TYPING.SplannoMessages+1)*4000, 1)
+end
+
+function TYPING.BigMsg(pUnit, msg)
+   if (type(msg) == "number") then
+      msg = TYPING.SplannoMessages[msg]
+   end
+   pUnit:SendChatMessage(42, 0, msg)
+end
+
+function TYPING.NewWordGo(pUnit, player)
+   if (AreAllDead(player)) then
+      pUnit:SendChatMessage(12, 0, "Well, that was fun.")
+      pUnit:RemoveEvents()
+      return
+   end
+   local msgs = {
+      "Okay then, how about...",
+      "Let's see you handle...",
+      "Type this:"
+   }
+   pUnit:SendChatMessage(12, 0, msgs[math.random(#msgs)])
+   pUnit:CreateLuaEvent(function() TYPING.NewWordGo2(pUnit, player) end, 4000, 1)
+end
+
+function TYPING.NewWordGo2(pUnit, player)
+   local choice = TYPING.words[math.random(#TYPING.words)]
+   pUnit:SendChatMessage(14, 0, choice:upper().."!")
+   local tLimit = #choice+3
+   local hp = pUnit:GetHealthPct()
+   if (hp < 90 and hp > 50) then
+      tLimit = #choice
+   elseif (hp < 50) then
+      tLimit = math.ceil(#choice/1.5)
+   end
+   if (player:IsInGroup()) then
+      for k,v in pairs(player:GetGroupPlayers()) do
+         TYPING.RequestWord(pUnit, v, choice, tLimit)
+      end
+   else
+      TYPING.RequestWord(pUnit, player, choice, tLimit)
+   end
+end
+
+function TYPING.RequestWord(pUnit, player, word, tLimit)
+   COMMUNICATOR.Send(player, "SHOW", "CommTyping")
+   COMMUNICATOR.Send(player, "TIMER:"..tLimit, "CommTyping")
+   TYPING.current[tostring(player)] = word
+   player:CreateLuaEvent(function() TYPING.WordTimeout(pUnit, player) end, tLimit*1000, 1)
+   pUnit:CreateLuaEvent(function() TYPING.NewWordGo(pUnit, player) end, tLimit*1000+2000, 1)
+end
+
+function TYPING.WordTimeout(pUnit, player)
+   pUnit:Kill(player)
+   TYPING.current[tostring(player)] = nil
+   local msgs = {
+      "Puny little insects!",
+      "Weak minds shall perish!",
+      "And that was an easy one, too!"
+   }
+   pUnit:SendChatMessage(14, 0, msgs[math.random(#msgs)])
+end
+
+function OnAddonReceive(player, msg)
+   if (msg:find("LINKEXISTS:") == 1) then
+      local _, _, exists = msg:find("LINKEXISTS:(.+)")
+      exists = (exists == "true")
+      -- validate the player as having the addon here!
+   elseif (msg:find("INPUT:") == 1 and TYPING.current[tostring(player)] ~= nil) then
+      local _, _, input = msg:find("INPUT:(.+)")
+      if (input == TYPING.current[tostring(player)]) then
+         player:RemoveEvents()
+         local pUnit = GetBoss(player)
+         if (pUnit:GetHealthPct()-40 > 0) then
+            pUnit:SetHealthPct(pUnit:GetHealthPct()-40)
+         else
+            player:Kill(pUnit)
+            pUnit:RemoveEvents()
+         end
+      else
+         player:Kill(player)
+         COMMUNICATOR.Send(player, "HIDE", "CommTyping")
+      end
+   end
+end
+
+COMMUNICATOR.HookOnReceive("CommTyping", OnAddonReceive)
+
+RegisterUnitGossipEvent(MgrID, 1, TYPING.MgrGossip)
+RegisterUnitGossipEvent(MgrID, 2, TYPING.MgrGossip2)
+RegisterUnitEvent(BossID, 18, TYPING.BossLoad)

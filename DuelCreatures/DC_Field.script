@@ -1,0 +1,184 @@
+-----------------------
+--Made by Hypersniper--
+----Duel Creatures-----
+-----------------------
+
+--Field stuff.
+
+local par = getfenv(1)
+assert(type(par) == "table", "DuelCreatures: Critical error, parent module missing!")
+module(par._NAME..".FIELD", package.seeall)
+local self = getfenv(1)
+setmetatable(self, {__index = par.SHARED})
+
+--PARAMETERS--
+
+nFaceDownCardGO = 550006
+nFaceDownCardNPC = 70001
+nDuelCreature = 70002
+nFaceUpCardGO = 550007
+
+nMeleeKillSpell = 42903 --default melee kill spell to use if no kill spell is mentioned in DB
+nKillSpellTarget = 70003 --entry id to attack when attacking life points directly with a DB-defined kill spell.
+
+--END PARAMETERS--
+
+--FIELDS: [nIndex] = { fieldspell, { [nConsole] = { {monsters}, {spells} } } }
+
+--[[
+     Handle activating field spell effects.
+     This involves applying visual changes (removing old/adding new) and applying atk boost effects etc.
+--]]
+function ActivateFieldSpell(index, nConsole, dcid)
+   CALL_CARD_EVENT(EVENTS.ON_DISCARD, FIELDS[index][1], index, nConsole)
+   FIELDS[index][1] = dcid
+   CALL_CARD_EVENT(EVENTS.ON_MAGIC_ACTIVATED, dcid, index, nConsole)
+   SendMessageToDuel(index, string.format("%s activated the field spell card %s!", DUELS[index][nConsole], DC_DB_CACHE[dcid].Name))
+end
+
+--[[
+     Returns x,y,z,o where the GO/Unit should go if spawned in this slot.
+     _type is a CARD_TYPE, nConsole is used to determine which side of the field, slot is 1-5.
+     Uses random maths, just understand it works out the right spot.
+--]]
+function GetSlotPosition(_type, nConsole, slot)
+   assert(CARD_TYPE[_type] and (nConsole == 1 or nConsole == 2) and slot >= 1 and slot <= 5, "GetSlotPosition error - invalid type/duelist/slot")
+   local slot3x, slot3y, slot3z = ox + 16*math.cos(2.564 + (nConsole-1)*(math.pi+0.1)), oy + 16*math.sin(2.564 + (nConsole-1)*(math.pi+0.1)), oz
+   local slot3o = calcRadAngle(slot3x, slot3y, ox, oy)
+   local x,y,z,o
+   --now we have the middle monster for the correct side.
+   if (slot == 3) then
+      x, y, z, o = slot3x, slot3y, slot3z, slot3o
+   elseif (slot < 3) then --math.pi / 2
+      local modd
+      if (slot == 2) then modd = 1; else modd = 2; end
+      x = slot3x + 10 * (modd) * math.cos(slot3o+math.pi/2)
+      y = slot3y + 10 * (modd) * math.sin(slot3o+math.pi/2)
+      z = slot3z
+      o = slot3o
+   elseif (slot > 3) then -- 3 * math.pi / 2
+      x = slot3x + 10 * (slot-3) * math.cos(slot3o+3*math.pi/2)
+      y = slot3y + 10 * (slot-3) * math.sin(slot3o+3*math.pi/2)
+      z = slot3z
+      o = slot3o
+   end
+   if (_type ~= 1) then --magic cards: 10 yards south
+      x = x + 10 * math.cos(o+math.pi)
+      y = y + 10 * math.sin(o+math.pi)
+   end
+   return x,y,z,o
+end
+
+--[[
+     Handle setting a face down card. slot is 1-5, monster/magic row determined by dcid.
+     Involves creating the card object, the face-down GO, etc.
+--]]
+function SetCard(index, nConsole, slot, dcid, bSpecial)
+   local proto = DC_DB_CACHE[dcid]
+   local player = GetPlayer(DUELS[index][nConsole]) --nConsole is either 1 or 2 which matches nicely with our DUELS table.
+   assert(player and player:IsInWorld() and player:IsAlive() and proto, "SetCard error - invalid player/dcid")
+   if (proto.Type == CARD_TYPE.Monster) then
+      local x,y,z,o = GetSlotPosition(proto.Type, nConsole, slot)
+      local phase = math.pow(2, DUELS[index][3])
+      local unit = player:SpawnCreature(nFaceDownCardNPC, x, y, z, o+math.pi/2, 7, 0, 0, 0, 0, phase)
+      if (bSpecial == nil) then bSpecial = false; end
+      unit:SetScale(3)
+      local obj = DC_Creature:Create(dcid, unit)
+      obj.m_index = index; obj.m_side = nConsole; obj.m_slot = slot;
+      obj.wasSpecialSummoned = bSpecial
+      obj.m_face = 1 --it's face down.
+      obj.m_mode = 1 --defense mode
+      FIELDS[index][2][nConsole][1][slot] = obj
+      CALL_CARD_EVENT(EVENTS.ON_SUMMON, dcid, index, nConsole, obj)
+      SendMessageToDuel(index, player:GetName().." set a monster card in face-down defense mode!")
+   else --magic cards
+      local x,y,z,o = GetSlotPosition(proto.Type, nConsole, slot)
+      local phase = math.pow(2, DUELS[index][3])
+      local go = player:SpawnGameObject(nFaceDownCardGO, x, y, z, o, 0, 300, phase)
+      local obj = DC_Magic:Create(dcid, go)
+      obj.m_index = index; obj.m_side = nConsole; obj.m_slot = slot;
+      obj.m_face = 1 --it's face down.
+      FIELDS[index][2][nConsole][2][slot] = obj
+      SendMessageToDuel(index, player:GetName().." set a spell or trap card face-down!")
+   end
+end
+
+--[[
+     Handles spell "summoning" - activating from hand.
+--]]
+function ActivateSpellCard(index, nConsole, slot, dcid)
+   local player = GetPlayer(DUELS[index][nConsole]) --nConsole is either 1 or 2 which matches nicely with our DUELS table.
+   local proto = DC_DB_CACHE[dcid]
+   assert(player and player:IsInWorld() and player:IsAlive() and proto, "ActivateSpellCard error - invalid player/dcid")
+   local x,y,z,o = GetSlotPosition(proto.Type, nConsole, slot)
+   local phase = math.pow(2, DUELS[index][3])
+   local dur = 5000; if (proto.S_Type == SPELL_TYPE.Continuous or (proto.Type == CARD_TYPE.Spell and proto.S_Type == SPELL_TYPE.Equip)) then dur = 0; end
+   local go = player:SpawnGameObject(nFaceUpCardGO, x, y, z, o, dur, 300, phase)
+   if (proto.Type == CARD_TYPE.Trap or (proto.Type == CARD_TYPE.Spell and proto.S_Type ~= SPELL_TYPE.Equip)) then
+      CALL_CARD_EVENT(EVENTS.ON_MAGIC_ACTIVATED, dcid, index, nConsole)
+   end
+   if (proto.S_Type == SPELL_TYPE.Continuous or (proto.Type == CARD_TYPE.Spell and proto.S_Type == SPELL_TYPE.Equip)) then
+      local obj = DC_Magic:Create(dcid, go)
+      obj.m_index = index; obj.m_side = nConsole; obj.m_slot = slot;
+      obj.m_action = true;
+      FIELDS[index][2][nConsole][2][slot] = obj
+   end
+end
+
+--[[
+     Handles summoning a monster, creating unit, binding it, etc.
+--]]
+function SummonMonster(index, nConsole, slot, dcid, bSpecial)
+   local proto = DC_DB_CACHE[dcid]
+   local player = GetPlayer(DUELS[index][nConsole]) --nConsole is either 1 or 2 which matches nicely with our DUELS table.
+   assert(player and player:IsInWorld() and player:IsAlive() and proto and proto.Type == CARD_TYPE.Monster, "SummonMonster error - invalid player/dcid")
+   if (bSpecial == nil) then bSpecial = false; end
+   local x,y,z,o = GetSlotPosition(proto.Type, nConsole, slot)
+   local phase = math.pow(2, DUELS[index][3])
+   local unit
+   unit = player:SpawnCreature(nDuelCreature, x, y, z, o, 7, 0, 0, 0, 0, phase)
+   unit:SetModel(proto.M_Display)
+   --update client side... for now... this is cactus though
+   player:CreateLuaEvent(function() unit:SetPosition(x,y,z,o); unit:SetFacing(o); end, 1, 1)
+   unit:SetScale(proto.M_Scale)
+   local obj = DC_Creature:Create(dcid, unit)
+   obj.m_index = index; obj.m_side = nConsole; obj.m_slot = slot;
+   obj.wasSpecialSummoned = bSpecial
+   obj:SetAttack(proto.M_Attack)
+   obj:SetDefense(proto.M_Defense)
+   FIELDS[index][2][nConsole][1][slot] = obj
+   SendMessageToDuel(index, player:GetName().." summoned "..proto.Name.." in attack mode!")
+   CALL_CARD_EVENT(EVENTS.ON_SUMMON, dcid, index, nConsole, obj) --
+end
+
+--Clears per-turn creature/magic variables (m_action, m_justPlayed and non-persistent m_extras)
+function ClearTurnStuff(index, nConsole)
+   for slot=1,5 do
+      for row=1,2 do
+         if (FIELDS[index][2][nConsole][row][slot]) then
+            FIELDS[index][2][nConsole][row][slot].m_action = false
+            FIELDS[index][2][nConsole][row][slot].m_justPlayed = false
+            if (row == 1) then FIELDS[index][2][nConsole][row][slot].m_hasAttacked = false; end
+            for k,v in pairs(FIELDS[index][2][nConsole][row][slot].m_extras) do
+               if (not (type(k) == "string" and k:find("P_") == 1)) then
+                  FIELDS[index][2][nConsole][row][slot].m_extras[k] = nil
+               end
+            end
+         end
+      end
+   end
+end
+
+--Makes it so Duel Creature units can never die.
+--If you ever need death animation, use unit:SetStandState(7)
+function PreDCCreatureDie(event, killer, unit)
+   if (unit:GetEntry() == nFaceDownCardNPC or unit:GetEntry() == nDuelCreature or unit:GetEntry() == nKillSpellTarget) then
+      unit:SetHealth(unit:GetMaxHealth())
+      unit:SetMana(unit:GetMaxMana())
+      return false
+   end
+end
+
+RegisterServerHook(28, PreDCCreatureDie)
+RegisterUnitEvent(nKillSpellTarget, 18, function(u) u:SetUInt32Value(UNIT_FIELD_FLAGS, UNIT_FLAG_NOT_SELECTABLE); end)
+RegisterUnitEvent(nDuelCreature, 18, function() return; end)

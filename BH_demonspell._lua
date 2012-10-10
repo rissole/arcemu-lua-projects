@@ -1,0 +1,60 @@
+-----------------------
+--Made by Hypersniper--
+-------wow-v.com-------
+--For Burning Heavens--
+-----------------------
+
+DSPELLY = {}
+DSPELLY.entry = 30000
+DSPELLY.coords = { --some coords for him to tele around to.
+{1000, 1000, 0, 0},
+{2000, 2000, 0, 0},
+{3000, 3000, 0, 0}
+}
+
+function DSPELLY.OnCombat(pUnit)
+   pUnit:RegisterEvent("DSPELLY.Special", 30000, 0)
+   pUnit:RegisterEvent("DSPELLY.Shadowbolt", 3000, 0)
+   pUnit:CastSpell(45399) --demonic vapor trail
+   pUnit:RegisterEvent("DSPELLY.DemonicBlast", 10000, 0)
+   pUnit:RegisterEvent("DSPELLY.Shield", 60000, 0)
+end
+
+function DSPELLY.Special(pUnit)
+   pUnit:SendChatMessage(14, 0, "Ha ha ha...")
+   pUnit:RegisterEvent("DSPELLY.Special2", 1000, #(DSPELLY.coords))
+end
+
+function DSPELLY.Shadowbolt(pUnit)
+   pUnit:CastSpellOnTarget(36868, pUnit:GetRandomTarget(0))
+end
+
+function DSPELLY.DemonicBlast(pUnit)
+   pUnit:CastSpell(60094)
+end
+
+function DSPELLY.Shield(pUnit)
+   pUnit:CastSpell(31901)
+end
+
+function DSPELLY.Special2(pUnit)
+   local t = DSPELLY[math.random(#(DSPELLY.coords))]
+   pUnit:SetPosition(t[1], t[2], t[3], t[4])
+   pUnit:CastSpellAoF(pUnit:GetX(), pUnit:GetY(), pUnit:GetZ(), 61112)
+   --death and decay
+end
+
+function DSPELLY.removeEvents(pUnit)
+   pUnit:RemoveEvents()
+end
+
+function DSPELLY.OnKill(pUnit)
+   if (math.random(10) <= 5) then
+      pUnit:SendChatMessage(14, 0, "Another one... excellent...")
+   end
+end
+
+RegisterUnitEvent(DSPELLY.entry, 1, "DSPELLY.OnCombat")
+RegisterUnitEvent(DSPELLY.entry, 2, "DSPELLY.removeEvents")
+RegisterUnitEvent(DSPELLY.entry, 3, "DSPELLY.OnKill")
+RegisterUnitEvent(DSPELLY.entry, 4, "DSPELLY.removeEvents")

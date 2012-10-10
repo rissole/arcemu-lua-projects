@@ -1,0 +1,68 @@
+-----------------------
+--Made by Hypersniper--
+-----Project Ronin-----
+-----------------------
+
+SW_MEDICS = {}
+
+local nDyingGuy = 365
+local nCleric1 = 366
+local nCleric2 = 367
+
+local function GetClosestMedic(pUnit)
+   local c1 = pUnit:GetCreatureNearestCoords(pUnit:GetX(), pUnit:GetY(), pUnit:GetZ(), nCleric1)
+   local c2 = pUnit:GetCreatureNearestCoords(pUnit:GetX(), pUnit:GetY(), pUnit:GetZ(), nCleric2)
+   
+   if (not c1) then
+      return c2
+   elseif (not c2) then
+      return c1
+   elseif (not c1 and not c2) then
+      return nil
+   end
+   
+   local d1 = pUnit:GetDistanceYards(c1)
+   local d2 = pUnit:GetDistanceYards(c2)
+   
+   if (d1 < d2) then
+      return c1
+   else
+      return c2
+   end
+   
+   return nil
+end
+
+function SW_MEDICS.Cleric_Drink(pUnit)
+   pUnit:SetStandState(1) --sit
+   pUnit:EventCastSpell(pUnit, 66041, 1500, 1) --drink!
+   pUnit:RegisterEvent(function() pUnit:SetStandState(0); end, 32000, 1)
+end
+
+function SW_MEDICS.EventBleed(pUnit)
+   if (pUnit:GetHealth() > 20) then
+      pUnit:SetHealth(pUnit:GetHealth() - 20)
+   end
+end
+
+function SW_MEDICS.Dying_WoundSelf(pUnit)
+   local cleric = GetClosestMedic(pUnit)
+   if (not cleric) then return; end
+   pUnit:AddAura(35321, 25000, false) --gushing wound
+   pUnit:PlaySpellVisual(pUnit:GetGUID(), 220) --bleed visual
+   pUnit:RegisterEvent(SW_MEDICS.EventBleed, 4000, 1)
+   local function EventHeal()
+      pUnit:RemoveAllAuras();
+      cleric:FullCastSpellOnTarget(139, pUnit);
+      cleric:RegisterEvent(SW_MEDICS.Cleric_Drink, 16000, 1); 
+   end
+   pUnit:RegisterEvent(EventHeal, 5000, 1) --renew
+end
+
+function SW_MEDICS.Dying_OnSpawn(pUnit)
+   pUnit:RegisterEvent(SW_MEDICS.Dying_WoundSelf, math.random(120000, 240000), 1)
+end
+
+RegisterUnitEvent(nDyingGuy, 18, SW_MEDICS.Dying_OnSpawn)
+RegisterUnitEvent(nCleric1, 18, function() return; end)
+RegisterUnitEvent(nCleric2, 18, function() return; end)

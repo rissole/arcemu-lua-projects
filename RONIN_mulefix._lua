@@ -1,0 +1,21 @@
+-----------------------
+--Made by Hypersniper--
+-----Project Ronin-----
+-----------------------
+
+MULE = {}
+MULE.entry = 32980
+
+function MULE.OnSpawn(pUnit)
+   pUnit:RegisterEvent(MULE.RealSpawn, 100, 1) --safety first!
+end
+
+function MULE.RealSpawn(pUnit)
+   local gSummoner = pUnit:GetUInt64Value(UNIT_FIELD_SUMMONEDBY) --14
+   local player = pUnit:GetUnitByGUID(gSummoner)
+   if (not player) then print("Mule error: cannot find player"); return; end
+   pUnit:SetUnitToFollow(player, 5, 1.02)
+   --player:ChannelSpell(43368, pUnit)
+end
+
+RegisterUnitEvent(MULE.entry, 18, MULE.OnSpawn)

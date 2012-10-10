@@ -1,0 +1,13 @@
+function gtt(u, e, p)
+	u:StopMovement(1)
+	u:GossipCreateMenu(65536, p, 0)
+	u:GossipMenuAddItem(4, "test", 1, 0)
+	u:GossipMenuAddItem(4, "nvm", 2, 0)
+	u:GossipSendMenu(p)
+end
+function gst(u, e, p, id, intid, code)
+	u:MoveTo(u:GetX()+5, u:GetY()+5, u:GetZ(), 0)
+	p:GossipComplete()
+end
+RegisterUnitGossipEvent(24437,1,gtt)
+RegisterUnitGossipEvent(24437,2,gst)

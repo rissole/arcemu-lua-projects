@@ -1,0 +1,44 @@
+<Ui xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns="http://www.blizzard.com/wow/ui/">
+	<Script file="lua.lua" />
+	<Frame name="AGGRORINGFRAME" alpha="0.7" parent="UIParent" toplevel="true" movable="true" enableMouse="true">
+		<Size>
+			<AbsDimension x="128" y="64" />
+		</Size>
+		<Anchors>
+			<Anchor point="TOPLEFT">
+				<Offset>
+					<AbsDimension x="500" y="200" />
+				</Offset>
+			</Anchor>
+		</Anchors>
+		<Scripts>
+			<OnMouseDown>self:StartMoving();</OnMouseDown>
+			<OnMouseUp>self:StopMovingOrSizing();</OnMouseUp>
+			<OnLoad>AGGRORINGFRAME_OnLoad();</OnLoad>
+			<OnEvent>AGGRORINGFRAME_OnEvent();</OnEvent>
+		</Scripts>
+		<Layers>
+			<Layer>
+				<FontString name="AGGRORING_Radius" inherits="GameFontNormalLarge">
+					<Size x="100" y="20" />
+					<Anchors>
+						<Anchor point="TOPLEFT">
+							<Offset x="13" y="-21" />
+						</Anchor>
+					</Anchors>
+				</FontString>
+			</Layer>
+		</Layers>
+		<Backdrop bgFile="Interface\DialogFrame\UI-DialogBox-Background" edgeFile="Interface\DialogFrame\UI-DialogBox-Border" tile="true">
+			<BackgroundInsets>
+				<AbsInset left="11" right="12" top="12" bottom="11" />
+			</BackgroundInsets>
+			<TileSize>
+				<AbsValue val="32" />
+			</TileSize>
+			<EdgeSize>
+				<AbsValue val="32" />
+			</EdgeSize>
+		</Backdrop>
+	</Frame>
+</Ui>

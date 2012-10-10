@@ -1,0 +1,7 @@
+function MyTestDummySpell(effectIndex, spell)
+   if (spell:GetTarget():IsPlayer() == true) then
+      spell:GetTarget():KickPlayer(5000)
+   end
+end
+
+RegisterDummySpell(46642, "MyTestDummySpell")

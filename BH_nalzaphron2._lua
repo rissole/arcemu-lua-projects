@@ -1,0 +1,407 @@
+------------------------------
+-- NALZAPHRON THE SUMMONER --
+------------------------------
+
+local NALZAPHRON_ENTRY = 80000017
+
+local TRIGGER_1_ENTRY = 80000018
+
+local DEATH_PORTAL_ENTRY = 80000020
+local BEGINNING_CASTERS_ENTRY_1 = 80000024
+local BEGINNING_CASTERS_ENTRY_2 = 80000025
+local ZOMBIE_WARRIORS_ENTRY = 80000021
+local GHOUL_ENTRY = 80000022
+
+-- GLOBALS
+NALZAPHRON = {}
+OBJECT_END = 0x0006
+UNIT_FIELD_FLAGS = OBJECT_END + 0x0034
+UNIT_FLAG_NOT_ATTACKABLE_2 = 0x00000002
+UNIT_FLAG_NOT_SELECTABLE = 0x02000000
+
+--Makes better random numbers
+math.randomseed(os.time()); math.random(); math.random(); math.random();
+
+---Finds units based on entry ID, returns in a table. Good for areAllDead
+local function getUnitsByEntry(pUnit, entry)
+   local ret = {}
+   for k,v in pairs(pUnit:GetInRangeUnits()) do
+      if (v:GetEntry() == entry) then
+         table.insert(ret, v)
+      end
+   end
+   if (#ret == 0) then
+      print("getUnitsByEntry warning: no units found with entry "..entry)
+   end
+   return ret
+end
+
+---Returns ONLY 1 unit with specified entry
+local function getUnitByEntry(pUnit, entry)
+   local t = getUnitsByEntry(pUnit, entry)
+   if (#t > 0) then
+      return t[1]
+   else
+      return nil
+   end
+end
+
+---Returns true if all units in the table are dead, false otherwise
+local function areAllDead(units)
+   if (#units == 0) then return false; end
+   for k,v in pairs(units) do
+      if (v:IsDead() == false) then --NOT DEAD
+         return false
+      end
+   end
+   return true
+end
+
+function NALZAPHRON.TriggersOnSpawn(pUnit, event)
+   pUnit:SetUInt32Value(UNIT_FIELD_FLAGS, UNIT_FLAG_NOT_SELECTABLE)
+end
+
+function NALZAPHRON.OnLeaveCombat(pUnit, event)
+   pUnit:RemoveEvents()
+end
+
+function NALZAPHRON.OnKillPlayer(pUnit, event)
+   pUnit:SendChatMessage(14, 0, "Ha ha... Lookie here boys! A lost hero. A lost hero that never learned to fight!")
+end
+
+function NALZAPHRON.OnDeath(pUnit, event)
+   pUnit:RemoveEvents()
+   pUnit:SendChatMessage(14, 0, "My freedom was forfeit long ago!")
+end
+
+function NALZAPHRON.OnSpawn(pUnit, event)
+   pUnit:SpawnCreature(BEGINNING_CASTERS_ENTRY_1, pUnit:GetX(), pUnit:GetY()-10+(5*1), pUnit:GetZ(), pUnit:GetO(), pUnit:GetFaction(), 0)
+   pUnit:SpawnCreature(BEGINNING_CASTERS_ENTRY_1, pUnit:GetX(), pUnit:GetY()-10+(5*2), pUnit:GetZ(), pUnit:GetO(), pUnit:GetFaction(), 0)
+   pUnit:SpawnCreature(BEGINNING_CASTERS_ENTRY_2, pUnit:GetX(), pUnit:GetY()-10+(5*3), pUnit:GetZ(), pUnit:GetO(), pUnit:GetFaction(), 0)
+   pUnit:SendChatMessage(12, 0, "Do you fear death?")
+   pUnit:SetUInt32Value(UNIT_FIELD_FLAGS, UNIT_FLAG_NOT_ATTACKABLE_2)
+   pUnit:Unroot()
+   pUnit:SetCombatCapable(0)
+   --hypersniper: we must have a slight delay between spawning -> using GetInRangeUnits
+   pUnit:RegisterEvent("NALZAPHRON.doChannelVisual", 500, 1)
+   pUnit:RegisterEvent("NALZAPHRON.checkBeginningCastersDead", 1000, 0)
+end
+
+function NALZAPHRON.doChannelVisual(pUnit)
+   local spell
+   if (math.random(10) <= 5) then
+      spell = 58012 -- Portal Channel
+   else
+      spell = 51754 -- Frost Channel
+   end
+   pUnit:ChannelSpell(spell, getUnitByEntry(pUnit, TRIGGER_1_ENTRY))
+end
+
+function NALZAPHRON.checkBeginningCastersDead(pUnit)
+   if (areAllDead(getUnitsByEntry(pUnit, BEGINNING_CASTERS_ENTRY_1)) and areAllDead(getUnitsByEntry(pUnit, BEGINNING_CASTERS_ENTRY_2))) then
+      pUnit:RemoveEvents()
+      pUnit:StopChannel()
+      pUnit:SetUInt32Value(UNIT_FIELD_FLAGS, 0)
+      for k,p in pairs(pUnit:GetInRangePlayers()) do
+         pUnit:AttackReaction(p, 100+k, 0)
+      end
+   end
+end
+
+function NALZAPHRON.OnCombat(pUnit, event, pAttacker)
+   pUnit:SendChatMessage(12, 0, "I'll take that as a no.")
+   pUnit:RegisterEvent("NALZAPHRON.Phase1", 1000, 0)
+end
+
+function NALZAPHRON.Phase1(pUnit)
+   if (pUnit:GetHealthPct() <= 95) then
+      pUnit:RemoveEvents()
+      pUnit:SendChatMessage(14, 0, "Hah! You cannot kill me!")
+      pUnit:RegisterEvent("NALZAPHRON.Frostbolt", 6000, 0)
+      pUnit:RegisterEvent("NALZAPHRON.ConeOfCold", 20000, 0)
+      pUnit:RegisterEvent("NALZAPHRON.IceLance", math.random(2000, 3000), 0)
+      pUnit:RegisterEvent("NALZAPHRON.IceBarrier", 30000, 0)
+      pUnit:RegisterEvent("NALZAPHRON.Phase2", 60000, 1)
+   end
+end
+
+function NALZAPHRON.Frostbolt(pUnit)
+   local p = pUnit:GetRandomPlayer(0)
+   if (p ~= nil and p:IsAlive() and p:IsInWorld()) then
+      pUnit:CastSpellOnTarget(38826, p)
+   else
+      pUnit:RegisterEvent("NALZAPHRON.Frostbolt", 100, 1)
+   end
+end
+
+function NALZAPHRON.ConeOfCold(pUnit)
+   pUnit:CastSpell(64655)
+end
+
+function NALZAPHRON.IceLance(pUnit)
+   local p = pUnit:GetRandomPlayer(0)
+   if (p ~= nil and p:IsAlive() and p:IsInWorld()) then
+      pUnit:CastSpellOnTarget(46194, p)
+   else
+      pUnit:RegisterEvent("NALZAPHRON.IceLance", 100, 1)
+   end
+end
+
+function NALZAPHRON.IceBarrier(pUnit)
+   --hypersniper: added this chat in, just thought an announce would be good
+   pUnit:SendChatMessage(14, 0, "Frozen tendrils, grant me your protection!")
+   pUnit:CastSpell(43039)
+end
+
+function NALZAPHRON.Phase2(pUnit)
+   pUnit:RemoveEvents()
+   pUnit:SendChatMessage(14, 0, "I am unstoppable! The Lich King has granted me unlimited power!")
+   pUnit:RegisterEvent("NALZAPHRON.SpawnPortal", 30000, 0)
+   pUnit:RegisterEvent("NALZAPHRON.VoidBolt", 8000, 0)
+   pUnit:RegisterEvent("NALZAPHRON.ShadowNova", 20000, 0)
+   pUnit:RegisterEvent("NALZAPHRON.Phase3", 1000, 0)
+end
+
+function NALZAPHRON.SpawnPortal(pUnit)
+   local p = pUnit:GetRandomPlayer(0)
+   local x,y,z,o
+   if (p ~= nil and p:IsAlive() and p:IsInWorld()) then
+      x = p:GetX()+5
+      y = p:GetY()
+      z = p:GetLandHeight(x, y)
+      o = p:GetO()
+      pUnit:SpawnCreature(DEATH_PORTAL_ENTRY, x, y, z, o, pUnit:GetFaction(), 20500)
+   else
+      pUnit:RegisterEvent("NALZAPHRON.SpawnPortal", 100, 1)
+   end
+end
+
+function NALZAPHRON.PortalOnSpawn(pUnit)
+   pUnit:RegisterEvent("NALZAPHRON.PortalDeathCoil", 4000, 0)
+   pUnit:RegisterEvent("NALZAPHRON.PortalExplosion", 20000, 1)
+end
+
+function NALZAPHRON.removeEvents(pUnit)
+   pUnit:RemoveEvents()
+end
+
+function NALZAPHRON.PortalDeathCoil(pUnit)
+   local p = pUnit:GetRandomPlayer(0)
+   if (p ~= nil and p:IsAlive() and p:IsInWorld()) then
+      pUnit:CastSpellOnTarget(41070, p)
+   else
+      pUnit:RegisterEvent("NALZAPHRON.PortalDeathCoil", 100, 1)
+   end
+end
+
+function NALZAPHRON.PortalExplosion(pUnit)
+   pUnit:CastSpell(63723) --hypersniper: 7k dmg shadow nova w/ knockback
+end
+
+function NALZAPHRON.VoidBolt(pUnit)
+   local p = pUnit:GetRandomPlayer(0)
+   if (p ~= nil and p:IsAlive() and p:IsInWorld()) then
+      pUnit:CastSpellOnTarget(39252, p)
+   else
+      pUnit:RegisterEvent("NALZAPHRON.VoidBolt", 100, 1)
+   end
+end
+
+function NALZAPHRON.ShadowNova(pUnit)
+   pUnit:CastSpell(59435)
+end
+
+function NALZAPHRON.Phase3(pUnit)
+   if (pUnit:GetHealthPct() <= 50) then
+      local sUnit = tostring(pUnit)
+      if (NALZAPHRON[sUnit] == nil) then
+         NALZAPHRON[sUnit] = {}
+      end
+      NALZAPHRON[sUnit].minions = {}
+      pUnit:RemoveEvents()
+      pUnit:SendChatMessage(14, 0, "Kill them!")
+      pUnit:SetUInt32Value(UNIT_FIELD_FLAGS, UNIT_FLAG_NOT_ATTACKABLE_2)
+      pUnit:Root()
+      pUnit:SetCombatCapable(1)
+      local spawn
+      for i=1,2 do
+         spawn = pUnit:SpawnCreature(BEGINNING_CASTERS_ENTRY_1, pUnit:GetX()-10+(5*i), pUnit:GetY(), pUnit:GetZ(), pUnit:GetO(), pUnit:GetFaction(), 0)
+         --hypersniper: @pUnit:GetY()-10+(5*i) - this will make mobs spawn in a line near boss.
+         --    x-----x-----x
+         NALZAPHRON[sUnit].minions[i] = spawn
+      end
+      spawn = pUnit:SpawnCreature(BEGINNING_CASTERS_ENTRY_2, pUnit:GetX()-10+(5*3), pUnit:GetY(), pUnit:GetZ(), pUnit:GetO(), pUnit:GetFaction(), 0)
+      NALZAPHRON[sUnit].minions[3] = spawn
+      pUnit:RegisterEvent("NALZAPHRON.Check2MinionsDead", 1000, 0)
+   end
+end
+
+function NALZAPHRON.Check2MinionsDead(pUnit)
+   local sUnit = tostring(pUnit)
+   local deadCount = 0
+   for k,v in pairs(NALZAPHRON[sUnit].minions) do
+      if (v:IsDead()) then
+         deadCount = deadCount + 1
+      end
+   end
+   if (deadCount >= 2) then
+      pUnit:RemoveEvents()
+      --hypersniper: that 45k dmg shadow nova won't work, I'm using this one + DealDamage
+      pUnit:ChannelSpell(30852, pUnit)
+      --hypersniper: another chat message, remove if you don't like
+      pUnit:SendChatMessage(42, 0, "Nalzaphron begins casting the Shadow Nova!")
+      pUnit:RegisterEvent("NALZAPHRON.CheckLastMinionDead", 1000, 5)
+      pUnit:RegisterEvent("NALZAPHRON.HugeShadowNova", 6000, 1)
+   end
+end
+
+function NALZAPHRON.CheckLastMinionDead(pUnit)
+   local sUnit = tostring(pUnit)
+   if (areAllDead(NALZAPHRON[sUnit].minions)) then
+      pUnit:RemoveEvents()
+      pUnit:StopChannel()
+      pUnit:SetUInt32Value(UNIT_FIELD_FLAGS, 0)
+      pUnit:Unroot()
+      pUnit:SetCombatCapable(0)
+      pUnit:RegisterEvent("NALZAPHRON.Phase4", 1000, 1)
+   end
+end
+
+function NALZAPHRON.HugeShadowNova(pUnit)
+   pUnit:StopChannel()
+   pUnit:CastSpell(30852) --small shadow nova + knockback
+   for k,v in pairs(pUnit:GetInRangePlayers()) do
+      pUnit:DealDamage(v, math.random(45000, 46000), 30852)
+   end
+   for k,v in pairs(NALZAPHRON[tostring(pUnit)].minions) do
+      v:Despawn(1, 0)
+   end
+   pUnit:RegisterEvent("NALZAPHRON.Phase3", 1000, 0)
+end
+
+function NALZAPHRON.Phase4(pUnit)
+   pUnit:SendChatMessage(14, 0, "Burn them with fire!")
+   pUnit:RegisterEvent("NALZAPHRON.Fireball", math.random(5000, 6000), 0)
+   pUnit:RegisterEvent("NALZAPHRON.FireNova", 15000, 0)
+   pUnit:RegisterEvent("NALZAPHRON.Pyroblast", 30000, 0)
+   pUnit:RegisterEvent("NALZAPHRON.Phase5", 1000, 0)
+end
+
+
+function NALZAPHRON.Fireball(pUnit)
+   local p = pUnit:GetRandomPlayer(0)
+   if (p ~= nil and p:IsAlive() and p:IsInWorld()) then
+      pUnit:CastSpellOnTarget(30943, p)
+   else
+      pUnit:RegisterEvent("NALZAPHRON.Fireball", 100, 1)
+   end
+end
+
+function NALZAPHRON.FireNova(pUnit)
+   pUnit:CastSpell(33132)
+end
+
+function NALZAPHRON.Pyroblast(pUnit)
+   local p = pUnit:GetRandomPlayer(0)
+   if (p ~= nil and p:IsAlive() and p:IsInWorld()) then
+      pUnit:CastSpellOnTarget(31263, p)
+   else
+      pUnit:RegisterEvent("NALZAPHRON.Pyroblast", 100, 1)
+   end
+end
+
+function NALZAPHRON.Phase5(pUnit)
+   if (pUnit:GetHealthPct() <= 20) then
+      local sUnit = tostring(pUnit)
+      NALZAPHRON[sUnit].minions = {}
+      pUnit:RemoveEvents()
+      pUnit:SendChatMessage(14, 0, "Get them, my minions!")
+      pUnit:SetUInt32Value(UNIT_FIELD_FLAGS, UNIT_FLAG_NOT_ATTACKABLE_2)
+      pUnit:Root()
+      NALZAPHRON.registerAfflictionSpells(pUnit)
+      local spawn
+      for i=1,3 do
+         spawn = pUnit:SpawnCreature(ZOMBIE_WARRIORS_ENTRY, pUnit:GetX(), pUnit:GetY()-10+(5*i), pUnit:GetZ(), pUnit:GetO(), pUnit:GetFaction(), 0)
+         NALZAPHRON[sUnit].minions[i] = spawn
+      end
+      spawn = pUnit:SpawnCreature(GHOUL_ENTRY, pUnit:GetX()+5, pUnit:GetY(), pUnit:GetZ(), pUnit:GetO(), pUnit:GetFaction(), 0)
+      NALZAPHRON[sUnit].minions[4] = spawn
+      pUnit:RegisterEvent("NALZAPHRON.CheckGhoulDead", 1000, 0)
+   end
+end
+
+function NALZAPHRON.registerAfflictionSpells(pUnit)
+   pUnit:RegisterEvent("NALZAPHRON.SeedOfCorruption", 20000, 0)
+   pUnit:RegisterEvent("NALZAPHRON.UnstableAffliction", 18000, 0)
+   pUnit:RegisterEvent("NALZAPHRON.CurseOfBAgony", 25000, 0)
+   pUnit:RegisterEvent("NALZAPHRON.DrainLife", 10000, 0)
+   pUnit:RegisterEvent("NALZAPHRON.Haunt", 15000, 0)
+end
+
+function NALZAPHRON.SeedOfCorruption(pUnit)
+   local p = pUnit:GetRandomPlayer(0)
+   if (p ~= nil and p:IsAlive() and p:IsInWorld()) then
+      pUnit:CastSpellOnTarget(39367, p)
+   else
+      pUnit:RegisterEvent("NALZAPHRON.SeedOfCorruption", 100, 1)
+   end
+end
+
+function NALZAPHRON.UnstableAffliction(pUnit)
+   local p = pUnit:GetRandomPlayer(0)
+   if (p ~= nil and p:IsAlive() and p:IsInWorld()) then
+      pUnit:CastSpellOnTarget(35183, p)
+   else
+      pUnit:RegisterEvent("NALZAPHRON.UnstableAffliction", 100, 1)
+   end
+end
+
+function NALZAPHRON.CurseOfBAgony(pUnit)
+   local p = pUnit:GetRandomPlayer(0)
+   if (p ~= nil and p:IsAlive() and p:IsInWorld()) then
+      pUnit:CastSpellOnTarget(45032, p)
+   else
+      pUnit:RegisterEvent("NALZAPHRON.CurseOfBAgony", 100, 1)
+   end
+end
+
+function NALZAPHRON.DrainLife(pUnit)
+   local p = pUnit:GetRandomPlayer(0)
+   if (p ~= nil and p:IsAlive() and p:IsInWorld()) then
+      pUnit:ChannelSpell(39676, p)
+   else
+      pUnit:RegisterEvent("NALZAPHRON.DrainLife", 100, 1)
+   end
+end
+
+function NALZAPHRON.Haunt(pUnit)
+   local p = pUnit:GetRandomPlayer(0)
+   if (p ~= nil and p:IsAlive() and p:IsInWorld()) then
+      pUnit:CastSpellOnTarget(59164, p)
+   else
+      pUnit:RegisterEvent("NALZAPHRON.Haunt", 100, 1)
+   end
+end
+
+function NALZAPHRON.CheckGhoulDead(pUnit)
+   local sUnit = tostring(pUnit)
+   if (NALZAPHRON[sUnit].minions[4]:IsDead()) then
+      pUnit:RemoveEvents()
+      pUnit:SetUInt32Value(UNIT_FIELD_FLAGS, 0)
+      pUnit:Unroot()
+      NALZAPHRON.registerAfflictionSpells(pUnit)
+      pUnit:SetHealthPct(10)
+   end
+end
+
+RegisterUnitEvent(NALZAPHRON_ENTRY, 18, "NALZAPHRON.OnSpawn")
+RegisterUnitEvent(NALZAPHRON_ENTRY, 1, "NALZAPHRON.OnCombat")
+RegisterUnitEvent(NALZAPHRON_ENTRY, 2, "NALZAPHRON.OnLeaveCombat")
+RegisterUnitEvent(NALZAPHRON_ENTRY, 3, "NALZAPHRON.OnKillPlayer")
+RegisterUnitEvent(NALZAPHRON_ENTRY, 4, "NALZAPHRON.OnDeath")
+
+RegisterUnitEvent(TRIGGER_1_ENTRY, 18, "NALZAPHRON.TriggersOnSpawn")
+
+RegisterUnitEvent(DEATH_PORTAL_ENTRY, 18, "NALZAPHRON.PortalOnSpawn")
+RegisterUnitEvent(DEATH_PORTAL_ENTRY, 2, "NALZAPHRON.removeEvents")
+RegisterUnitEvent(DEATH_PORTAL_ENTRY, 4, "NALZAPHRON.removeEvents")

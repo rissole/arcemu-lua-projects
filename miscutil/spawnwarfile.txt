@@ -1,0 +1,3 @@
+[07:28] Spawned 1000 of NPC 4949 (Thrall) in 5.007000s
+[07:29] Spawned 500 of NPC 4949 (Thrall) in 1.516000s
+[07:30] Spawned 2000 of NPC 4949 (Thrall) in 18.927000s

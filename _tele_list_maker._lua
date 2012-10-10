@@ -1,0 +1,42 @@
+--[[FORMAT:
+[name]
+Type:=type
+MapID:=mapid
+Xpos:=y
+Ypos:=x
+Zpos:=z
+Comment:=Extracted from WhyDB recalls by Hypersniper
+]]
+function Create_WEH_Tele_List()
+	local f = io.open("WEHTeleportList.txt", "w")
+	local count = tonumber(WorldDBQuery("SELECT COUNT(*) FROM recall"):GetColumn(0):GetULong())
+	for i=1, count do
+		local nfo = {[1] = {}}
+                for j=0,5 do 
+                   nfo[1][j+1] = WorldDBQuery("SELECT * from recall WHERE id="..i):GetColumn(j):GetString()
+                end
+		f:write("["..nfo[1][2].."]\n")
+		local type
+		if (nfo[1][3] == "0") then 
+			type="Eastern Kingdoms"
+		elseif (nfo[1][3] == "1") then 
+			type="Kalimdor"
+		elseif (nfo[1][3] == "530") then
+			type="Outlands"
+		elseif (nfo[1][3] == "571") then 
+			type="Northrend"
+		else 
+			type="Instance"
+		end
+		f:write("Type:="..type.."\n")
+		f:write("MapID:="..nfo[1][3].."\n")
+		f:write("XPos:="..nfo[1][5].."\n") --swap X and Y as per WEH		
+		f:write("YPos:="..nfo[1][4].."\n") --swap X and Y as per WEH
+		f:write("ZPos:="..nfo[1][6].."\n")
+		f:write("Comment:=Extracted from WhyDB recalls by Hypersniper\n\n")
+	end
+	f:close()
+	print("Created WEH Tele List")
+end
+
+Create_WEH_Tele_List()

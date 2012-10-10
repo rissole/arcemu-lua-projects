@@ -1,0 +1,6 @@
+## Interface: 20400
+## Title: WhispAutoReply
+## Notes: Performs actions when certain whispers are received.
+## Author: Hypersniper
+## Version: 1.0
+lua.lua

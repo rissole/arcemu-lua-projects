@@ -1,0 +1,89 @@
+<Ui xmlns="http://www.blizzard.com/wow/ui/"
+xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+xsi:schemaLocation="http://www.blizzard.com/wow/ui/FrameXML/UI.xsd">
+
+   <Script file="CommTyping.lua" />
+   <Frame name="TypingInputFrame" parent="UIParent" hidden="true" toplevel="true" movable="true" enableMouse="true">
+   <Size x="250" y="110" />
+   <Anchors>
+      <Anchor point="CENTER" relativePoint="CENTER" relativeTo="UIParent">
+         <Offset>
+	    <AbsDimension x="0" y="200" />
+         </Offset>
+      </Anchor>
+   </Anchors>
+   <Layers>
+      <Layer level="OVERLAY">
+        <FontString inherits="GameFontNormal" text="Enter text below:">
+	   <Anchors>
+	      <Anchor point="TOP">
+		 <Offset x="0" y="-20" />
+	      </Anchor>
+	   </Anchors>
+	</FontString>
+      </Layer> 
+   </Layers>
+   <Frames>
+       <EditBox name="$parentEditBox" autoFocus="true" frameStrata="HIGH" inherits="InputBoxTemplate">
+	   <Size>
+	      <AbsDimension x="150" y="16"/>
+	   </Size>
+	   <Anchors>
+	      <Anchor point="TOP">
+		 <Offset>
+		    <AbsDimension x="0" y="-40"/>
+		 </Offset>
+	      </Anchor>
+	   </Anchors>
+           <Scripts>
+              <OnShow>self:SetText("");</OnShow>
+           </Scripts>
+	</EditBox>
+        <Button name="$parentSendButton" inherits="UIPanelButtonTemplate2" text="Send">
+	   <Size>
+	      <AbsDimension x="98" y="22"/>
+	   </Size>
+	   <Anchors>
+	      <Anchor point="TOP" x="-55" y="-65"/>
+	   </Anchors>
+	   <Scripts>
+	      <OnClick>
+		TypingBossHandleSend(TypingInputFrameEditBox:GetText())
+		PlaySound("igMainMenuOptionCheckBoxOn");
+	      </OnClick>
+	   </Scripts>
+	</Button>
+        <Button name="$parentCancelButton" inherits="UIPanelButtonTemplate2" text="Cancel">
+	   <Size>
+	      <AbsDimension x="98" y="22"/>
+	   </Size>
+	   <Anchors>
+	      <Anchor point="TOP" x="55" y="-65"/>
+	   </Anchors>
+	   <Scripts>
+	      <OnClick>
+                TypingBossHandleCancel();
+		this:GetParent():Hide();
+		PlaySound("igMainMenuOptionCheckBoxOn");
+	      </OnClick>
+	   </Scripts>
+	</Button>
+   </Frames>
+   <Scripts>
+      <OnMouseDown>self:StartMoving();</OnMouseDown>
+      <OnMouseUp>self:StopMovingOrSizing();</OnMouseUp>
+   </Scripts>  
+   <Backdrop bgFile="Interface\DialogFrame\UI-DialogBox-Background" edgeFile="Interface\DialogFrame\UI-DialogBox-Border" tile="true">
+     <BackgroundInsets>
+        <AbsInset left="11" right="12" top="12" bottom="11" />
+     </BackgroundInsets>
+     <TileSize>
+       <AbsValue val="32" />
+     </TileSize>
+     <EdgeSize>
+       <AbsValue val="32" />
+     </EdgeSize>
+   </Backdrop>
+   </Frame>
+
+</Ui>

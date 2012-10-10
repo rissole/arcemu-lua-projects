@@ -1,0 +1,94 @@
+--CONST
+local irc_server = "irc.emulationnetwork.com"
+local irc_port = 6667
+local chan = "#StarPlusPLus"
+local game_chan = "IRC"
+
+--CONNECTION
+local socket = require("socket")
+local c = socket.connect(irc_server, irc_port)
+
+--SERVER HOOK
+function WIBO_OnChat(event, player, msg, type, lang, misc)
+   if (misc == game_chan) then --someone's sending chat to the IRC.
+      c:send("PRIVMSG "..chan.." :["..player:GetName().."] "..msg.."\r\n")
+   end
+end
+RegisterServerHook(16, "WIBO_OnChat")
+
+--RECEIVING
+function receive(conn)
+   while true do
+      conn:settimeout(0)
+      local s, status = conn:receive("*l")
+      if (s) then
+         print(s)
+         if (s:find("PING") == 1) then
+            conn:send("PONG "..s:sub(5).."\r\n")
+         end
+         local spos, _, name, msg = s:find(":(.*)!.*PRIVMSG "..chan.." :(.*)")
+         if (spos) then --we got a chat message...
+            if (msg:lower():find("^wibo[, ]*") == 1) then --they're talking to wibo
+               WIBO_HandleCommands(name, msg)
+            else --just send to world
+               WIBO_SendToGameChannel(name, msg)
+            end
+         end
+      end
+      if (status == "timeout") then
+	 coroutine.yield()
+      end
+   end
+end
+
+--MISC FUNCS
+function WIBO_SendToIRCChannel(msg)
+   c:send("PRIVMSG "..chan.." :"..msg.."\r\n")
+end
+
+function WIBO_SendToGameChannel(name, msg)
+   --append name tag to the message  
+   msg = "<"..name.."> "..msg
+   local p = LuaPacket:CreatePacket(150, 1500)
+   p:WriteUByte(17)
+   p:WriteULong(0)
+   p:WriteGUID(NumberToGUID(0))
+   p:WriteULong(0)
+   p:WriteString(game_chan)
+   p:WriteGUID(NumberToGUID(0))
+   p:WriteULong(#msg+1)
+   p:WriteString(msg)
+   SendPacketToWorld(p)
+end
+
+function WIBO_HandleCommands(name, msg)
+   local msg2 = msg:lower():gsub("^wibo[, ]*", "")
+   local args = {["name"] = name}
+   msg2:gsub("(%w+)", function(c) table.insert(args,c) end)
+   if (args[1] == "hello") then
+      WIBO_SendToIRCChannel("Hey, "..args.name)
+   elseif (args[1] == "dlua") then
+      local _, epos = msg:lower():find("dlua ")
+      local com = msg:sub(epos)
+      local f, error = loadstring(com)
+      if (type(f) == "function") then
+         f()
+      else
+         WIBO_SendToIRCChannel("ERROR: "..error)
+      end
+   end
+end
+
+--INIT
+c:send("NICK wibo\r\n")
+c:send("USER wibo wibo wibo :Wow Interface Bot\r\n")
+socket.sleep(3)
+c:send("JOIN "..chan.."\r\n")
+
+local thread = coroutine.create(function() receive(c); end)
+function dispatcherGo()
+   if (coroutine.status(thread) == "suspended") then
+      coroutine.resume(thread)
+   end
+end
+RegisterTimedEvent("dispatcherGo", 100, 0)

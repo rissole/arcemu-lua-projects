@@ -1,0 +1,507 @@
+-------------------[Burning Heavens]-------------------
+-- Scripted by Blackboy0 and Hypersniper --
+-- Temple City of En'kilah Level 100 Vendors --
+-------------------[Burning Heavens]-------------------
+
+----------------------
+-- GLOBALS --
+----------------------
+
+local COSTS = {}
+
+function BH_AppendVendorCosts(t)
+	for k,v in pairs(t) do
+		local invtype = tonumber(WorldDBQuery("SELECT inventorytype FROM items WHERE entry = "..v))
+		print(k)
+		print(k.." - invtype: "..invtype)
+		if (invtype == 1) then --INVTYPE_HEAD
+			COSTS[v] = 2
+		elseif (invtype == 3) then --INVTYPE_SHOULDERS
+			COSTS[v] = 2
+		elseif (invtype == 4) or (invtype == 5) or (invtype == 20) then --INVTYPE_BODY or INVTYPE_CHEST or INVTYPE_ROBE
+			COSTS[v] = 4
+		elseif (invtype == 7) then --INVTYPE_LEGS
+			COSTS[v] = 3
+		elseif (invtype == 10) then --INVTYPE_HANDS
+			COSTS[v] = 2
+		end
+	end
+end
+
+--[[ Keepers of the Artifacts ]]--
+KRIMEL = 24437
+ARTHRIX = 80000135
+NARZET = 80000136
+MALKERET = 80000137
+
+--[[ Artifact ]]--
+local ARTIFACT = 60096
+
+--[[ Warrior Artifacts ]]--
+-- DPS
+local Warrior1 =
+{
+["Bloodthane Helm"] = 60086,
+["Bloodthane Shoulderplates"] = 60087,
+["Bloodthane Breastplate"] = 60088,
+["Bloodthane Gauntlets"] = 60089,
+["Bloodthane Greaves"] = 60090
+}
+BH_AppendVendorCosts(Warrior1)
+
+-- Protection
+local Warrior2 = 
+{
+["Greathelm of Rebellion"] = 60091,
+["Pauldrons of Rebellion"] = 60092,
+["Breastplate of Rebellion"] = 60094,
+["Handguards of Rebellion"] = 60093,
+["Legguards of Rebellion"] = 60095
+}
+--BH_AppendVendorCosts(Warrior2)
+
+--[[ Paladin Artifacts ]]--
+-- Retribution
+local Paladin1 = 
+{
+["Faceguard of the Cerulean Sentinel"] = 60042,
+["Spaulders of the Cerulean Sentinel"] = 60041,
+["Chestpiece of the Cerulean Sentinel"] = 60043,
+["Gloves of the Cerulean Sentinel"] = 60044,
+["Leggings of the Cerulean Sentinel"] = 60045
+}
+--BH_AppendVendorCosts(Paladin1)
+
+-- Protection
+local Paladin2 = 
+{
+["Stoic Hierophant's Visor"] = 60037,
+["Stoic Hierophant's Pauldrons"] = 60038,
+["Stoic Hierophant's Chestplate"] = 60039,
+["Stoic Hierophant's Handguards"] = 60040,
+["Stoic Hierophant's Legplates"] = 60036
+}
+--BH_AppendVendorCosts(Paladin2)
+
+-- Holy
+local Paladin3 = 
+{
+["Crown of the Lightwarden"] = 60047,
+["Mantle of the Lightwarden"] = 60048,
+["Breastplate of the Lightwarden"] = 60049,
+["Gauntlets of the Lightwarden"] = 60050,
+["Greaves of the Lightwarden"] = 60046
+}
+--BH_AppendVendorCosts(Paladin3)
+
+--[[ Death Knight Artifacts ]]--
+-- Damage
+local DeathKnight1 = 
+{
+["Grieftouched Visor"] = 60005,
+["Grieftouched Shoulderplates"] = 60006,
+["Grieftouched Breastplate"] = 60007,
+["Grieftouched Gauntlets"] = 60008,
+["Grieftouched Greaves"] = 60009
+}
+--BH_AppendVendorCosts(DeathKnight1)
+
+-- Tank
+local DeathKnight2 = 
+{
+["Painsplitter Faceguard"] = 60000,
+["Painsplitter Shoulderguards"] = 60001,
+["Painsplitter Chestguard"] = 60002,
+["Painsplitter Handguards"] = 60003,
+["Painsplitter Legguards"] = 60004
+}
+--BH_AppendVendorCosts(DeathKnight2)
+
+--[[ Druid Artifacts ]]--
+-- Feral
+local Druid1 = 
+{
+["Hood of Carnal Frenzy"] = 60015,
+["Pauldrons of Carnal Frenzy"] = 60014,
+["Tunic of Carnal Frenzy"] = 60013,
+["Handgrips of Carnal Frenzy"] = 60012,
+["Legguards of Carnal Frenzy"] = 60011
+}
+--BH_AppendVendorCosts(Druid1)
+
+-- Balance
+local Druid2 = 
+{
+["Grovewhisper Mask"] = 60017,
+["Grovewhisper Mantle"] = 60018,
+["Grovewhisper Vestments"] = 60019,
+["Grovewhisper Grips"] = 60020,
+["Grovewhisper Sarong"] = 60016
+}
+--BH_AppendVendorCosts(Druid2)
+
+-- Restoration
+local Druid3 = 
+{
+["Sunkissed Collar"] = 60022,
+["Sunkissed Leaflets"] = 60023,
+["Sunkissed Garment"] = 60024,
+["Sunkissed Gloves"] = 60025,
+["Sunkissed Kilt"] = 60021
+}
+--BH_AppendVendorCosts(Druid3)
+
+--[[ Rogue Artifacts ]]--
+local Rogue = 
+{
+["Shadeshifter Focus Band"] = 60061,
+["Shadeshifter Epaulets"] = 60062,
+["Shadeshifter Tunic"] = 60063,
+["Shadeshifter Handgrips"] = 60064,
+["Shadeshifter Leggings"] = 60065
+}
+--BH_AppendVendorCosts(Rogue)
+
+--[[ Shaman Artifacts ]]--
+-- Enhancement
+local Shaman1 = 
+{
+["Stormripper Warhelm"] = 60066,
+["Stormripper Shoulderpads"] = 60067,
+["Stormripper Hauberk"] = 60068,
+["Stormripper Armsplints"] = 60069,
+["Stormripper Ringmail Sarong"] = 60070,
+}
+--BH_AppendVendorCosts(Shaman1)
+
+-- Elemental
+local Shaman2 = 
+{
+["Facemask of the Volcanic Soul"] = 60071,
+["Spaulders of the Volcanic Soul"] = 60072,
+["Tunic of the Volcanic Soul"] = 60073,
+["Handgrips of the Volcanic Soul"] = 60074,
+["Pleated Kilt of the Volcanic Soul"] = 60075,
+}
+--BH_AppendVendorCosts(Shaman2)
+
+-- Restoration
+local Shaman3 = 
+{
+["Azuretide Circlet"] = 60076,
+["Azuretide Amice"] = 60077,
+["Azuretide Chestpiece"] = 60078,
+["Azuretide Handwraps"] = 60079,
+["Azuretide Leggings"] = 60080,
+}
+--BH_AppendVendorCosts(Shaman3)
+
+--[[ Hunter Artifacts ]]--
+local Hunter = 
+{
+["Wormstalker Faceguard"] = 60027,
+["Wormstalker Shoulderpads"] = 60028,
+["Wormstalker Cuirass"] = 60029,
+["Wormstalker Gauntlets"] = 60030,
+["Wormstalker Greaves"] = 60026
+}
+--BH_AppendVendorCosts(Hunter)
+
+--[[ Mage Artifacts ]]--
+local Mage = 
+{
+["Circlet of the Raging Inferno"] = 60035,
+["Shoulderpads of the Raging Inferno"] = 60034,
+["Robe of the Raging Inferno"] = 60032,
+["Gloves of the Raging Inferno"] = 60033,
+["Leggings of the Raging Inferno"] = 60031
+}
+--BH_AppendVendorCosts(Mage)
+
+--[[ Warlock Artifacts ]]--
+local Warlock =
+{
+["gloves"] = 40420,
+["head"] = 40421,
+["legs"] = 40422,
+["robe"] = 40423,
+["shoulder"] = 40424
+}
+BH_AppendVendorCosts(Warlock)
+
+--[[ Priest Artifacts ]]--
+-- Healing
+local Priest1 = 
+{
+["Purewish Halo"] = 60051,
+["Purewish Amice"] = 60052,
+["Purewish Shroud"] = 60053,
+["Purewish Handwraps"] = 60054,
+["Purewish Breeches"] = 60055
+}
+--BH_AppendVendorCosts(Priest1)
+
+-- Damage
+local Priest2 =
+{
+["Hood of the Somberhearted"] = 60056,
+["Shoulderpads of the Somberhearted"] = 60057,
+["Gown of the Somberhearted"] = 60058,
+["Handwraps of the Somberhearted"] = 60059,
+["Leggings of the Somberhearted"] = 60060
+}
+--BH_AppendVendorCosts(Priest2)
+
+--------------------------------------------------------------
+-- KEEPER KRI'MEL (Artifacts of Magic) --
+--------------------------------------------------------------
+
+function Krimel_OnGossipTalk(pUnit, event, player)
+pUnit:GossipCreateMenu(KRIMEL, player, 0)
+if (player:GetPlayerClass() == "Warlock") then
+for k,v in pairs(Warlock) do
+pUnit:GossipMenuAddItem(1, k.." ["..COSTS[v].." artifacts]", v, 0)
+end
+elseif (player:GetPlayerClass() == "Mage") then
+for k,v in pairs(Mage) do
+pUnit:GossipMenuAddItem(1, k.." ["..COSTS[v].." artifacts]", v, 0)
+end
+elseif (player:GetPlayerClass() == "Priest") then
+pUnit:GossipMenuAddItem(6, "Purewish Set", 1, 0)
+pUnit:GossipMenuAddItem(6, "Somberhearted Set", 2, 0)
+end
+pUnit:GossipSendMenu(player)
+end
+
+function Krimel_OnGossipSelect(pUnit, event, player, id, intid, code)
+if (intid == 1) then
+pUnit:GossipCreateMenu(KRIMEL, player, 0)
+for k,v in pairs(Priest1) do
+pUnit:GossipMenuAddItem(1, k.." ["..COSTS[v].." artifacts]", v, 0)
+end
+pUnit:GossipMenuAddItem(0, "Back", 3, 0)
+pUnit:GossipSendMenu(player)
+elseif (intid == 2) then
+pUnit:GossipCreateMenu(KRIMEL, player, 0)
+for k,v in pairs(Priest2) do
+pUnit:GossipMenuAddItem(1, k.." ["..COSTS[v].." artifacts]", v, 0)
+end
+pUnit:GossipMenuAddItem(0, "Back", 3, 0)
+pUnit:GossipSendMenu(player)
+elseif (intid == 3) then
+Krimel_OnGossipTalk(pUnit, event, player)
+else
+if (player:GetItemCount(ARTIFACT) < COSTS[intid]) then
+player:SendAreaTriggerMessage("You do not have enough of the required artifact.")
+player:GossipComplete()
+else
+player:AddItem(intid, 1)
+player:RemoveItem(ARTIFACT, COSTS[intid])
+player:GossipComplete()
+end
+end
+end
+
+RegisterUnitGossipEvent(KRIMEL, 1, "Krimel_OnGossipTalk")
+RegisterUnitGossipEvent(KRIMEL, 2, "Krimel_OnGossipSelect")
+
+--------------------------------------------------------------------------
+-- KEEPER MAL'KERET (Artifacts of Protection) --
+--------------------------------------------------------------------------
+
+function MalKeret_OnGossipTalk(pUnit, event, player)
+pUnit:GossipCreateMenu(MALKERET, player, 0)
+if (player:GetPlayerClass() == "Warrior") then
+pUnit:GossipMenuAddItem(6, "Bloodthane Set", 1, 0)
+pUnit:GossipMenuAddItem(6, "Rebellion Set", 2, 0)
+elseif (player:GetPlayerClass() == "Paladin") then
+pUnit:GossipMenuAddItem(6, "Cerulean Sentinel Set", 3, 0)
+pUnit:GossipMenuAddItem(6, "Stoic Hierophant's Set", 4, 0)
+pUnit:GossipMenuAddItem(6, "Lightwarden Set", 5, 0)
+elseif (player:GetPlayerClass() == "Death Knight") then
+pUnit:GossipMenuAddItem(6, "Grieftouched Set", 6, 0)
+pUnit:GossipMenuAddItem(6, "Painsplitter Set", 7, 0)
+end
+pUnit:GossipSendMenu(player)
+end
+
+function MalKeret_OnGossipSelect(pUnit, event, player, id, intid, code)
+if (intid == 1) then
+pUnit:GossipCreateMenu(MALKERET, player, 0)
+for k,v in pairs(Warrior1) do
+pUnit:GossipMenuAddItem(1, k.." ["..COSTS[v].." artifacts]", v, 0)
+end
+pUnit:GossipMenuAddItem(0, "Back", 8, 0)
+pUnit:GossipSendMenu(player)
+elseif (intid == 2) then
+pUnit:GossipCreateMenu(MALKERET, player, 0)
+for k,v in pairs(Warrior2) do
+pUnit:GossipMenuAddItem(1, k.." ["..COSTS[v].." artifacts]", v, 0)
+end
+pUnit:GossipMenuAddItem(0, "Back", 8, 0)
+pUnit:GossipSendMenu(player)
+elseif (intid == 3) then
+pUnit:GossipCreateMenu(MALKERET, player, 0)
+for k,v in pairs(Paladin1) do
+pUnit:GossipMenuAddItem(1, k.." ["..COSTS[v].." artifacts]", v, 0)
+end
+pUnit:GossipMenuAddItem(0, "Back", 8, 0)
+pUnit:GossipSendMenu(player)
+elseif (intid == 4) then
+pUnit:GossipCreateMenu(MALKERET, player, 0)
+for k,v in pairs(Paladin2) do
+pUnit:GossipMenuAddItem(1, k.." ["..COSTS[v].." artifacts]", v, 0)
+end
+pUnit:GossipMenuAddItem(0, "Back", 8, 0)
+pUnit:GossipSendMenu(player)
+elseif (intid == 5) then
+pUnit:GossipCreateMenu(MALKERET, player, 0)
+for k,v in pairs(Paladin3) do
+pUnit:GossipMenuAddItem(1, k.." ["..COSTS[v].." artifacts]", v, 0)
+end
+pUnit:GossipMenuAddItem(0, "Back", 8, 0)
+pUnit:GossipSendMenu(player)
+elseif (intid == 6) then
+pUnit:GossipCreateMenu(MALKERET, player, 0)
+for k,v in pairs(DeathKnight1) do
+pUnit:GossipMenuAddItem(1, k.." ["..COSTS[v].." artifacts]", v, 0)
+end
+pUnit:GossipMenuAddItem(0, "Back", 8, 0)
+pUnit:GossipSendMenu(player)
+elseif (intid == 7) then
+pUnit:GossipCreateMenu(MALKERET, player, 0)
+for k,v in pairs(DeathKnight2) do
+pUnit:GossipMenuAddItem(1, k.." ["..COSTS[v].." artifacts]", v, 0)
+end
+pUnit:GossipMenuAddItem(0, "Back", 8, 0)
+pUnit:GossipSendMenu(player)
+elseif (intid == 8) then
+MalKeret_OnGossipTalk(pUnit, event, player)
+else
+if (player:GetItemCount(ARTIFACT) < COSTS[intid]) then
+player:SendAreaTriggerMessage("You do not have enough of the required artifact.")
+player:GossipComplete()
+else
+player:AddItem(intid, 1)
+player:RemoveItem(ARTIFACT, COSTS[intid])
+player:GossipComplete()
+end
+end
+end
+
+RegisterUnitGossipEvent(MALKERET, 1, "MalKeret_OnGossipTalk")
+RegisterUnitGossipEvent(MALKERET, 2, "MalKeret_OnGossipSelect")
+
+------------------------------------------------------------------
+-- KEEPER ARTH'RIX (Artifacts of Assault) --
+------------------------------------------------------------------
+
+function ArthRix_OnGossipTalk(pUnit, event, player)
+pUnit:GossipCreateMenu(ARTHRIX, player, 0)
+if (player:GetPlayerClass() == "Rogue") then
+for k,v in pairs(Rogue) do
+pUnit:GossipMenuAddItem(1, k.." ["..COSTS[v].." artifacts]", v, 0)
+end
+elseif (player:GetPlayerClass() == "Druid") then
+pUnit:GossipMenuAddItem(6, "Carnal Frenzy Set", 1, 0)
+pUnit:GossipMenuAddItem(6, "Grovewhisper Set", 2, 0)
+pUnit:GossipMenuAddItem(6, "Sunkissed Set", 3, 0)
+end
+pUnit:GossipSendMenu(player)
+end
+
+function ArthRix_OnGossipSelect(pUnit, event, player, id, intid, code)
+if (intid == 1) then
+pUnit:GossipCreateMenu(ARTHRIX, player, 0)
+for k,v in pairs(Druid1) do
+pUnit:GossipMenuAddItem(1, k.." ["..COSTS[v].." artifacts]", v, 0)
+end
+pUnit:GossipMenuAddItem(0, "Back", 4, 0)
+pUnit:GossipSendMenu(player)
+elseif (intid == 2) then
+pUnit:GossipCreateMenu(ARTHRIX, player, 0)
+for k,v in pairs(Druid2) do
+pUnit:GossipMenuAddItem(1, k.." ["..COSTS[v].." artifacts]", v, 0)
+end
+pUnit:GossipMenuAddItem(0, "Back", 4, 0)
+pUnit:GossipSendMenu(player)
+elseif (intid == 3) then
+pUnit:GossipCreateMenu(ARTHRIX, player, 0)
+for k,v in pairs(Druid3) do
+pUnit:GossipMenuAddItem(1, k.." ["..COSTS[v].." artifacts]", v, 0)
+end
+pUnit:GossipMenuAddItem(0, "Back", 4, 0)
+pUnit:GossipSendMenu(player)
+elseif (intid == 4) then
+ArthRix_OnGossipTalk(pUnit, event, player)
+else
+if (player:GetItemCount(ARTIFACT) < COSTS[intid]) then
+player:SendAreaTriggerMessage("You do not have enough of the required artifact.")
+player:GossipComplete()
+else
+player:AddItem(intid, 1)
+player:RemoveItem(ARTIFACT, COSTS[intid])
+player:GossipComplete()
+end
+end
+end
+
+RegisterUnitGossipEvent(ARTHRIX, 1, "ArthRix_OnGossipTalk")
+RegisterUnitGossipEvent(ARTHRIX, 2, "ArthRix_OnGossipSelect")
+
+---------------------------------------------------------------------
+-- KEEPER NAR'ZET (Artifacts of Onslaught) --
+---------------------------------------------------------------------
+
+function NarZet_OnGossipTalk(pUnit, event, player)
+pUnit:GossipCreateMenu(NARZET, player, 0)
+if (player:GetPlayerClass() == "Hunter") then
+for k,v in pairs(Hunter) do
+pUnit:GossipMenuAddItem(1, k.." ["..COSTS[v].." artifacts]", v, 0)
+end
+elseif (player:GetPlayerClass() == "Shaman") then
+pUnit:GossipMenuAddItem(6, "Stormripper Set", 1, 0)
+pUnit:GossipMenuAddItem(6, "Volcanic Soul Set", 2, 0)
+pUnit:GossipMenuAddItem(6, "Azuretide Set", 3, 0)
+end
+pUnit:GossipSendMenu(player)
+end
+
+function NarZet_OnGossipSelect(pUnit, event, player, id, intid, code)
+if (intid == 1) then
+pUnit:GossipCreateMenu(NARZET, player, 0)
+for k,v in pairs(Shaman1) do
+pUnit:GossipMenuAddItem(1, k.." ["..COSTS[v].." artifacts]", v, 0)
+end
+pUnit:GossipMenuAddItem(0, "Back", 4, 0)
+pUnit:GossipSendMenu(player)
+elseif (intid == 2) then
+pUnit:GossipCreateMenu(NARZET, player, 0)
+for k,v in pairs(Shaman2) do
+pUnit:GossipMenuAddItem(1, k.." ["..COSTS[v].." artifacts]", v, 0)
+end
+pUnit:GossipMenuAddItem(0, "Back", 4, 0)
+pUnit:GossipSendMenu(player)
+elseif (intid == 3) then
+pUnit:GossipCreateMenu(NARZET, player, 0)
+for k,v in pairs(Shaman3) do
+pUnit:GossipMenuAddItem(1, k.." ["..COSTS[v].." artifacts]", v, 0)
+end
+pUnit:GossipMenuAddItem(0, "Back", 4, 0)
+pUnit:GossipSendMenu(player)
+elseif (intid == 4) then
+NarZet_OnGossipTalk(pUnit, event, player)
+else
+if (player:GetItemCount(ARTIFACT) < COSTS[intid]) then
+player:SendAreaTriggerMessage("You do not have enough of the required artifact.")
+player:GossipComplete()
+else
+player:AddItem(intid, 1)
+player:RemoveItem(ARTIFACT, COSTS[intid])
+player:GossipComplete()
+end
+end
+end
+
+RegisterUnitGossipEvent(NARZET, 1, "NarZet_OnGossipTalk")
+RegisterUnitGossipEvent(NARZET, 2, "NarZet_OnGossipSelect")

@@ -1,0 +1,35 @@
+INSTANCE_ASYLUM = {}
+
+function INSTANCE_ASYLUM.MadScientist_SpawnWave(pUnit, event)
+   local iid = pUnit:GetInstanceID()
+   if (INSTANCE_ASYLUM[iid] == nil) then
+      INSTANCE_ASYLUM[iid] = {}
+      INSTANCE_ASYLUM[iid].wave = 1
+   end
+   if (INSTANCE_ASYLUM[iid].wave == 1) then
+      pUnit:SendChatMessage(14, 0, "Go, my front line minions!")
+      INSTANCE_ASYLUM[iid].mob1 = pUnit:SpawnCreature(320, pUnit:GetX(), pUnit:GetY(), pUnit:GetZ(), 0, 14, 0)
+      INSTANCE_ASYLUM[iid].mob2 = pUnit:SpawnCreature(321, pUnit:GetX(), pUnit:GetY(), pUnit:GetZ(), 0, 14, 0)
+   elseif (INSTANCE_ASYLUM[iid].wave == 2) then
+      pUnit:SendChatMessage(14, 0, "Go, my lieutenant!")
+      INSTANCE_ASYLUM[iid].mob3 = pUnit:SpawnCreature(322, pUnit:GetX(), pUnit:GetY(), pUnit:GetZ(), 0, 14, 0)
+   end
+   pUnit:RegisterEvent("INSTANCE_ASYLUM.MadScientist_CheckDead", 1000, 0)
+end
+
+function INSTANCE_ASYLUM.MadScientist_CheckDead(pUnit, event)
+   local iid = pUnit:GetInstanceID()
+   if (INSTANCE_ASYLUM[iid].wave == 1)
+      if (INSTANCE_ASYLUM[iid].mob1:IsDead() == true and INSTANCE_ASYLUM[iid].mob2:IsDead() == true) then
+         INSTANCE_ASYLUM[iid].wave = INSTANCE_ASYLUM[iid].wave+1
+         pUnit:RegisterEvent("INSTANCE_ASYLUM.MadScientist_SpawnWave", 5000, 1)
+      end
+   elseif (INSTANCE_ASYLUM[iid].wave == 2)
+      if (INSTANCE_ASYLUM[iid].mob3:IsDead() == true) then
+         INSTANCE_ASYLUM[iid].wave = INSTANCE_ASYLUM[iid].wave+1
+         pUnit:SendChatMessage(14, 0, "How could you defeat my waves of monsters!?")
+      end
+   end
+end
+
+RegisterUnitEvent(319, 1, "INSTANCE_ASYLUM.MadScientist_SpawnWave")

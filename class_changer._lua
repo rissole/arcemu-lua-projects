@@ -1,0 +1,45 @@
+local CLASS_CHANGE_ITEM = 90005
+
+local UNIT_FIELD_BYTES_0 = 23
+
+local function setClass(player, class)
+   player:SetByteValue(UNIT_FIELD_BYTES_0, 1, class)
+end
+
+local function getClass(player)
+   return player:GetByteValue(UNIT_FIELD_BYTES_0, 1)
+end
+
+function ClassChanger_GossipHello(pItem, event, player)
+   pItem:GossipCreateMenu(0, player, 0)
+   pItem:GossipMenuAddItem(0, "I want to be a Warrior!", 1, 0)
+   pItem:GossipMenuAddItem(0, "I want to be a Paladin!", 2, 0)
+   pItem:GossipMenuAddItem(0, "I want to be a Hunter!", 3, 0)
+   pItem:GossipMenuAddItem(0, "I want to be a Rogue!", 4, 0)
+   pItem:GossipMenuAddItem(0, "I want to be a Priest!", 5, 0)
+   pItem:GossipMenuAddItem(0, "I want to be a Death Knight!", 6, 0)
+   pItem:GossipMenuAddItem(0, "I want to be a Shaman!", 7, 0)
+   pItem:GossipMenuAddItem(0, "I want to be a Mage!", 8, 0)
+   pItem:GossipMenuAddItem(0, "I want to be a Warlock!", 9, 0)
+   pItem:GossipMenuAddItem(0, "I want to be a Druid!", 11, 0)
+   pItem:GossipMenuAddItem(0, "I don't want to change class!", 50, 0)
+   pItem:GossipSendMenu(player)
+end
+
+function ClassChanger_GossipSelect(pItem, event, player, id, intid, code)
+   if (intid == 50) then
+      player:GossipComplete()
+   else
+      if (getClass(player) ~= intid) then
+         setClass(player, intid)
+         player:RemoveItem(CLASS_CHANGE_ITEM, 1)
+         player:SendBroadcastMessage("Class change complete. Relog to see the effect.")
+      else
+         player:SendBroadcastMessage("ERROR: You are already that class, please choose another class!")
+         player:GossipComplete()
+      end
+   end
+end
+
+RegisterItemGossipEvent(CLASS_CHANGE_ITEM, 1, ClassChanger_GossipHello)
+RegisterItemGossipEvent(CLASS_CHANGE_ITEM, 2, ClassChanger_GossipSelect)

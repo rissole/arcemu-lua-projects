@@ -1,0 +1,74 @@
+local npcid = 24437 --the entry id of your custom npc with same name as item
+local itemid = 74772 --gossip item
+local messenger --stores the messenger npc
+local ingamespawn
+
+function itemPreviewNpc_OnSpawn(pUnit, event)
+	messenger = pUnit
+end
+
+function SpamChatMessage(pUnit, event)
+	ingamespawn:SendChatMessage("I'm here because of your PerformIngameSpawn!")
+end
+
+function itemPreview_OnGossipTalk(item, event, player)	
+	item:GossipCreateMenu(3545, player, 0)
+	item:GossipMenuAddItem(3, "Preview: |cffFF8000[Ashbringer]|r", 1, 0)
+	item:GossipMenuAddItem(3, "Preview: |cff808080[Cracked Buckler]|r", 2, 0)
+	item:GossipMenuAddItem(3, "Preview: |cff00FF00[Sturdy Cobalt Quickblade]|r", 3, 0)
+	item:GossipMenuAddItem(3, "Preview: |cff8000FF[The Turning Tide]|r", 4, 0)
+	item:GossipMenuAddItem(3, "Preview: |cffFFFFFF[Baby Spice]|r", 5, 0)
+	item:GossipMenuAddItem(3, "Preview: |cffe5cc80[Bloodied Arcanite Reaper]|r", 6, 0)
+	item:GossipMenuAddItem(3, "Spawn me a Drywhisker Kobold!", 7, 0)
+	item:GossipMenuAddItem(3, "Print my entry id and name", 8, 0)
+	item:GossipSendMenu(player)
+end
+
+function itemPreview_OnGossipSelect(item, event, player, id, intid, code, pMisc)
+	if(intid == 1) then
+		messenger:SendChatMessage(15,0,"Preview of Item: \124cffff8000\124Hitem:13262:0:0:0:0:0:0:0:0\124h[Ashbringer]\124h\124r",player)
+		player:SendBroadcastMessage("Preview of Item: \124cffff8000\124Hitem:13262:0:0:0:0:0:0:0:0\124h[Ashbringer]\124h\124r")
+		player:GossipComplete()
+	end
+
+	if(intid == 2) then
+		messenger:SendChatMessage(15,0,"Preview of Item: \124cff808080\124Hitem:2212:0:0:0:0:0:0:0:0\124h[Cracked Buckler]\124h\124r",player)
+		player:GossipComplete()
+	end
+
+	if(intid == 3) then
+		messenger:SendChatMessage(15,0,"Preview of Item: \124cff00FF00\124Hitem:41239:0:0:0:0:0:0:0:0\124h[Sturdy Cobalt Quickblade]\124h\124r",player)
+		player:GossipComplete()
+	end
+
+	if(intid == 4) then
+		messenger:SendChatMessage(15,0,"Preview of Item: \124cff8000FF\124Hitem:40396:0:0:0:0:0:0:0:0\124h[The Turning Tide]\124h\124r",player)
+		player:GossipComplete()
+	end
+
+	if(intid == 5) then
+		messenger:SendChatMessage(15,0,"Preview of Item: \124cffFFFFFF\124Hitem:44228:0:0:0:0:0:0:0:0\124h[Baby Spice]\124h\124r",player)
+		player:GossipComplete()
+	end
+
+	if(intid == 6) then
+		messenger:SendChatMessage(15,0,"Preview of Item: \124cffe5cc80\124Hitem:42943:0:0:0:0:0:0:0:0\124h[Bloodied Arcanite Reaper]\124h\124r",player)
+		player:GossipComplete()
+	end
+
+	if(intid == 7) then
+		ingamespawn = PerformIngameSpawn(1,2572,player:GetMapId(),player:GetX(),player:GetY(),player:GetZ(),player:GetO(),35,0)
+		--ingamespawn:RegisterEvent("SpamChatMessage", 1000, 0)
+		player:GossipComplete()
+	end
+
+	if(intid == 8) then
+		print(item:GetEntryId())
+		print(item:GetName())
+		player:GossipComplete()
+	end
+end
+
+RegisterItemGossipEvent(itemid, 1, "itemPreview_OnGossipTalk")
+RegisterItemGossipEvent(itemid, 2, "itemPreview_OnGossipSelect")
+RegisterUnitEvent(npcid, 18, "itemPreviewNpc_OnSpawn")

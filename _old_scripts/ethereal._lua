@@ -1,0 +1,17 @@
+--[[local npcid = 24437
+function ether_OnGossipTalk(pUnit, event, player)
+	local unitinfo = pUnit:GetUnitInfoFromEntry(19043)
+	player:SendVendorWindow(unitinfo)
+end
+
+function ether_OnGossipSelect(pUnit, event, player, id, intid, code)
+
+end
+
+function ether_OnGossipEnd(pUnit, event, player)
+
+end
+
+RegisterUnitGossipEvent(npcid, 1, "ether_OnGossipTalk")
+--RegisterUnitGossipEvent(npcid, 2, "ether_OnGossipSelect")
+--RegisterUnitGossipEvent(npcid, 3, "ether_OnGossipEnd")]]

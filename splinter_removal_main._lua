@@ -1,0 +1,64 @@
+-----------------------
+--Made by Hypersniper--
+-----Project Ronin-----
+-----------------------
+
+module("SPLINTER_REMOVAL", package.seeall)
+print("Splinter Removal Loader:")
+
+--SHARED VARS
+OBJECT_END = 0x0006
+UNIT_NPC_FLAGS = OBJECT_END + 0x004C
+UNIT_FIELD_FLAGS = OBJECT_END + 0x0035
+UNIT_DYNAMIC_FLAGS = 78
+U_DYN_FLAG_DEAD = 32
+UNIT_FLAG_NOT_ATTACKABLE_2 = 0x02
+UNIT_FLAG_NOT_SELECTABLE = 0x2000000
+PLAYER_FARSIGHT = 624
+Races =
+{
+  "Human",
+  "Orc",
+  "Dwarf",
+  "Night Elf",
+  "Undead",
+  "Tauren",
+  "Gnome",
+  "Troll",
+  [10] = "Blood Elf",
+  [11] = "Draenei"
+}
+
+function CreateClosure(method, ...)
+   local args = arg
+   local closure = function(...) return method(unpack(arg), unpack(args)) end
+   return closure
+end
+
+function GetCreatureInRange(pUnit, entry)
+   for _,v in pairs(pUnit:GetInRangeUnits()) do
+      if (v:GetEntry() == entry) then
+         return v
+      end
+   end
+   return nil
+end
+--END SHARED VARS
+
+local mod = getfenv(1)
+local directory = "scripts/SPLINTER_REMOVAL/"
+local modules = { "vigilante_justice.script", "close_to_home.script" }
+for _,v in pairs(modules) do
+   local loader_function, errormsg = loadfile(directory..v)
+   if (loader_function == nil) then
+      print(errormsg)
+   else
+      setfenv(loader_function, mod)
+      local ret, errormsg = pcall(loader_function)
+      if (ret == false) then
+         print(errormsg)
+      else
+         print(string.format("Successfully loaded script file: \"%s\"", v))
+      end
+   end
+end

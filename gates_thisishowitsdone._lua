@@ -1,0 +1,69 @@
+HGateDef = {}
+
+--melee 41-44
+--range 45-48
+--heals 49-50
+
+local function isDefender(pUnit)
+   if (pUnit:GetEntry() >= 41 and pUnit:GetEntry() <= 44) then
+      return true
+   end
+   return false
+end
+
+function HGateDef.All_RemoveEvents(pUnit)
+   if (pUnit:GetEntry() >= 49) then
+      pUnit:CastSpell(19634)
+   end
+   if (HGateDef[tostring(pUnit)] == nil) then return; end
+   for i,v in ipairs(HGateDef[tostring(pUnit)]) do
+      RemoveTimedEvent(v)
+   end
+   HGateDef[tostring(pUnit)] = nil
+end
+
+function HGateDef.MeleeRangers_Combat(pUnit, e, pMisc)
+   if (isDefender(pUnit)) then
+      local ref1 = RegisterTimedEvent("HGateDef.Melee_SelfSpell", 30000, 0, pUnit, 74781) --slowshout
+      local ref2 = RegisterTimedEvent("HGateDef.Melee_SelfSpell", 8000, 0, pUnit, 63785) --whirl
+      local ref3 = RegisterTimedEvent("HGateDef.Melee_SelfSpell", 1000, 1, pUnit, 58110) --threat pulse
+      HGateDef[tostring(pUnit)] = {ref1,ref2,ref3}
+   else
+      local ref1 = RegisterTimedEvent("HGateDef.Rangers_TargetSpell", 10000, 0, pUnit, 38328, pMisc) --reduce threat
+      HGateDef[tostring(pUnit)] = {ref1}
+   end
+end
+
+function HGateDef.Melee_SelfSpell(pUnit, spell)
+   pUnit:CastSpell(spell)
+end
+
+function HGateDef.Rangers_TargetSpell(pUnit, spell, target)
+   pUnit:CastSpellOnTarget(spell,target)
+end
+
+function HGateDef.Healers_Spawn(pUnit)
+   pUnit:SetCombatMeleeCapable(1)
+   pUnit:Root()
+   RegisterTimedEvent("HGateDef.Healers_Pulse", 1000, 0, pUnit)
+end
+
+function HGateDef.Healers_Pulse(pUnit)
+   if (pUnit:GetCurrentSpellId() ~= nil) then return; end
+   for k,v in pairs(pUnit:GetInRangeFriends()) do
+      if (v:IsCreature() and v:IsAlive() and isDefender(v) and v:GetHealthPct() <= 40) then
+         pUnit:FullCastSpellOnTarget(5188,v) --healing wave
+      end
+   end
+end
+
+for i=41,50 do --shared funcs (on die, on leave combat)
+   RegisterUnitEvent(i, 2, "HGateDef.All_RemoveEvents");
+   RegisterUnitEvent(i, 4, "HGateDef.All_RemoveEvents");
+end
+for i=49,50 do --spawn funcs (medics)
+   RegisterUnitEvent(i, 18, "HGateDef.Healers_Spawn");
+end
+for i=41,48 do --shared on combat funcs
+   RegisterUnitEvent(i, 1, "HGateDef.MeleeRangers_Combat");
+end

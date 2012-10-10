@@ -1,0 +1,103 @@
+TRAITOR = {}
+local OBJECT_END = 0x0006
+local UNIT_NPC_FLAGS = OBJECT_END + 0x004C
+local UNIT_FIELD_FLAGS = OBJECT_END + 0x0034
+local UNIT_FLAG_NOT_SELECTABLE = 0x02000000
+
+local function GetUnitByEntry(pUnit, entry)
+   local u = pUnit:GetCreatureNearestCoords(pUnit:GetX(), pUnit:GetY(), pUnit:GetZ(), entry)
+   if (type(u) ~= "userdata") then
+      print("GetUnitByEntry warning: no unit found with entry "..entry)
+   end
+   return u
+end
+
+local function GetDefaultNPCFlags(pUnit)
+   local res = WorldDBQuery("SELECT `npcflags` FROM `creature_proto` WHERE `entry`='"..pUnit:GetEntry().."'")
+   local col = res:GetColumn(0)
+   return col:GetLong()
+end
+
+function TRAITOR.TrigOnSpawn(pUnit, event)
+   pUnit:SetUInt32Value(UNIT_FIELD_FLAGS, UNIT_FLAG_NOT_SELECTABLE)
+end
+
+---Lith'ix speaks, walks to location
+function TRAITOR.QuestComplete(player, id)
+   local pUnit = GetUnitByEntry(player, 80000002)
+   local eib = GetUnitByEntry(player, 80000000)
+   local rek = GetUnitByEntry(player, 80000006)
+   pUnit:SetUInt32Value(UNIT_NPC_FLAGS, 0)
+   eib:SetUInt32Value(UNIT_NPC_FLAGS, 0)
+   rek:SetUInt32Value(UNIT_NPC_FLAGS, 0)
+   TRAITOR[tostring(pUnit)] = player
+   pUnit:SendChatMessage(12, 0, player:GetName()..", let us empower this barrier key. Mistress Eibbed and Reknez Foulblade, please join me.")
+   pUnit:SetMovementFlags(0)
+   pUnit:MoveTo(6686.387207, 3361.838135, 704.151978, 6.214849)
+   pUnit:Emote(1, 1500)
+   RegisterTimedEvent("TRAITOR.Part1", 2000, 1, pUnit, eib, rek)
+end
+
+---Mistress Eibbed unmounts and walks to location, Reknez Foulblade walks to location
+function TRAITOR.Part1(pUnit, eib, rek)
+   local eibTar = {6691.513672, 3365.726074, 704.181274, 4.310264}
+   local eibNow = {eib:GetX(), eib:GetY(), eib:GetZ(), eib:GetO()}
+   local rekTar = {6692.544922, 3360.838623, 704.600830, 2.664849}
+   local rekNow = {rek:GetX(), rek:GetY(), rek:GetZ(), rek:GetO()}
+   local distance = 0
+   for i,v in ipairs(eibNow) do
+      distance = distance + (v-eibTar[i])^2
+   end
+   local t = math.floor(math.sqrt(distance)/2.5*1000)
+   --WOWOWOWOW I worked out how to measure how long it will take to get to their destination~~~
+   eib:SetMovementFlags(0)
+   eib:SetMount(0)
+   eib:MoveTo(eibTar[1], eibTar[2], eibTar[3], eibTar[4])
+   rek:SetMovementFlags(0)
+   rek:MoveTo(rekTar[1], rekTar[2], rekTar[3], rekTar[4])
+   RegisterTimedEvent("TRAITOR.UnitsAtDest", t, 1, pUnit, eib, rek)
+end
+
+---All begin to channel spell "43417" on ChannelTrigger
+function TRAITOR.UnitsAtDest(pUnit, eib, rek)
+   pUnit:RemoveEvents()
+   local trig = GetUnitByEntry(pUnit, 80000019)
+   pUnit:ChannelSpell(43417, trig)
+   eib:ChannelSpell(43417, trig)
+   rek:ChannelSpell(43417, trig)
+   RegisterTimedEvent("TRAITOR.Part2", 10000, 1, pUnit, eib, rek)
+end
+
+--After 10 seconds, channeling stops. Mistress Eibbed speaks
+function TRAITOR.Part2(pUnit, eib, rek)
+   pUnit:StopChannel()
+   rek:StopChannel()
+   eib:StopChannel()
+   eib:SendChatMessage(12, 0, "It is done. The barrier key is empowered.")
+   eib:Emote(1, 1500)
+   RegisterTimedEvent("TRAITOR.Part3", 4000, 1, pUnit, eib, rek)
+end
+
+---Lith'ix turns to the player then Lith'ix speaks
+function TRAITOR.Part3(pUnit, eib, rek)
+   local player = TRAITOR[tostring(pUnit)]
+   pUnit:SetFacing(pUnit:CalcRadAngle(pUnit:GetX(), pUnit:GetY(), player:GetX(), player:GetY()))
+   pUnit:SetOrientation(pUnit:CalcRadAngle(pUnit:GetX(), pUnit:GetY(), player:GetX(), player:GetY()))
+   pUnit:SendChatMessage(12, 0, "The key is empowered and ready for use. Speak to me when you are ready to take on the final task of destroying the instigator of the Fleshwerks, the great Lich: Nalzaphron the Summoner.")
+   pUnit:Emote(1, 1500)
+   RegisterTimedEvent("TRAITOR.Part4", 6000, 1, pUnit, eib, rek)
+end
+
+---Mistress Eibbed mounts; Mistress Eibbed, Reknez Foulblade, and Lith'ix walk back to their spawn locations.
+function TRAITOR.Part4(pUnit, eib, rek)
+   eib:SetMount(28108)
+   eib:ReturnToSpawnPoint()
+   rek:ReturnToSpawnPoint()
+   pUnit:ReturnToSpawnPoint()
+   eib:SetUInt32Value(UNIT_NPC_FLAGS, GetDefaultNPCFlags(eib))
+   rek:SetUInt32Value(UNIT_NPC_FLAGS, GetDefaultNPCFlags(rek))
+   pUnit:SetUInt32Value(UNIT_NPC_FLAGS, GetDefaultNPCFlags(pUnit))
+end
+
+RegisterUnitEvent(80000019, 18, "TRAITOR.TrigOnSpawn")
+RegisterQuestEvent(8200022, 2, "TRAITOR.QuestComplete")

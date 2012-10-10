@@ -1,0 +1,28 @@
+-----------------------
+--Made by Hypersniper--
+-------wow-v.com-------
+--For Burning Heavens--
+-----------------------
+
+VROMOS = {}
+
+function VROMOS.OnCombat(pUnit, event, pAttacker)
+   pUnit:RegisterEvent("VROMOS.DiseaseBuffet", 12000, 0)
+end
+
+function VROMOS.DiseaseBuffet(pUnit)
+   local p = pUnit:GetRandomPlayer(0)
+   if (p == nil) then 
+      pUnit:RegisterEvent("VROMOS.DiseaseBuffet", 500, 1)
+   else
+      pUnit:CastSpellOnTarget(46481, p) --disease buffet
+   end
+end
+
+function VROMOS.removeEvents(pUnit)
+   pUnit:RemoveEvents()
+end
+
+RegisterUnitEvent(80000013, 1, "VROMOS.OnCombat")
+RegisterUnitEvent(80000013, 2, "VROMOS.removeEvents")
+RegisterUnitEvent(80000013, 4, "VROMOS.removeEvents")

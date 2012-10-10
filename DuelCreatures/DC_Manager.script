@@ -1,0 +1,351 @@
+-----------------------
+--Made by Hypersniper--
+----Duel Creatures-----
+-----------------------
+
+--Manager Gossip, challenge handling.
+
+local par = getfenv(1)
+assert(type(par) == "table", "DuelCreatures: Critical error, parent module missing!")
+module(par._NAME..".MANAGER", package.seeall)
+local self = getfenv(1)
+setmetatable(self, {__index = par.SHARED})
+
+--PARAMETERS--
+
+nManager = 70000
+nSeatEntry = 24610
+vP1Coords = {0, -13236.86, 291.80, 36.75, 5.78} --map, x, y, z, o
+vP2Coords = {0, -13171.35, 255.16, 36.75, 2.63} --map, x, y, z, o
+nChallengeSound = 12347
+nDeclineSound = 680
+nDuelTimeout = 60000 --milliseconds
+
+--END PARAMETERS--
+
+--DUELS: [nIndex] = { sDueller, sDuellee, nPhaseIndex, {seating}, nGamePhase, bFirstTurn }
+CHALLENGES = {} --[nIndex] = {sChallenger, sChallengee, nTimeoutFunctionRef, nPhaseIndex}
+PHASEINDEX = 1 --2^this == current phase
+
+--[[
+     Returns the index (key) of the challenge the player is currently in + true/false if/if not challengER.
+     Returns nil if not involved in a challenge.
+--]]
+function GetChallengeIndex(sName)
+   for index, sub in pairs(CHALLENGES) do
+      if (sub[1] == sName) then --challengER
+         return index, true
+      elseif (sub[2] == sName) then --challengEE
+         return index, false
+      end
+   end
+   return nil
+end
+
+--[[
+     Returns the key of CHALLENGES that has the provided phase index, or nil.
+--]]
+function GetChallengeByPhaseIndex(nPhaseI)
+   for index, sub in pairs(CHALLENGES) do
+      if (sub[4] == nPhaseI) then
+         return index
+      end
+   end
+   return nil
+end
+
+--[[
+     Returns x,y,z,o,id of the first free seat in the specified phase index.
+     Returns nil if full
+--]]
+function FindFreeSeat(nPhaseI)
+   local index = GetDuelByPhaseIndex(nPhaseI)
+   local nSeat = 0
+   if (DUELS[index][4] == nil) then
+      DUELS[index][4] = {}
+      nSeat = 1
+   else
+      for i=1, #(DUELS[index][4])+1 do
+         if (DUELS[index][4][i] == nil) then
+            nSeat = i
+            break
+         end
+      end
+   end
+   local z = 43 --The Z of the seats. Position of seats based on this and the origin (ox,oy)
+   local j = 1
+   for i=0, 2*math.pi, 0.1 do
+      if ((not (i >= 3.3 and i <= 5.0)) and (not (i <= 0.3 or i >= 5.9)) and (not (i >= 2.0 and i <= 2.5))) then
+         local x = ox + 71 * math.cos(i)
+         local y = oy + 71 * math.sin(i)
+         local o = calcRadAngle(x, y, ox, oy)
+         if (j == nSeat) then
+            return x,y,z,o,nSeat
+         else
+            j = j + 1
+         end
+      end
+   end
+   return nil
+end
+
+--[[
+     Returns the seat index, duel index the player is currently spectating from.
+     Returns nil if they aren't on a seat.
+--]]
+function GetPlayerSeat(sName)
+   for i=1, #DUELS do
+      for nSeat, name in ipairs(DUELS[i][4]) do
+         if (name == sName) then
+            return nSeat, i
+         end
+      end
+   end
+   return nil
+end
+
+--[[
+     Returns true if player has a Duel Creatures card, false otherwise.
+--]]
+function PlayerHasCard(player)
+   return (#(GetAllCards(player)) > 0)
+end
+
+function OnGossip(pUnit, event, player)
+   pUnit:GossipCreateMenu(69999, player, 0) --Yo, $N. What are you here for?
+   pUnit:GossipMenuAddItem(0, "I'd like to start a duel.", 10, 0)
+   pUnit:GossipMenuAddItem(0, "I want to spectate a duel.", 11, 0)
+   pUnit:GossipMenuAddItem(0, "Never mind", 1, 0)
+   pUnit:GossipSendMenu(player)
+end
+
+function OnGossipSel(pUnit, event, player, id, intid, code)
+   if (intid == 1) then
+      --1 -> 10 = back buttons
+      return player:GossipComplete()
+   elseif (intid == 2) then
+      return OnGossip(pUnit, event, player)
+   elseif (intid == 3) then
+      return OnGossipSel(pUnit, event, player, 0, 10, "")
+   elseif (intid == 10) then
+      --10 -> 11 = public/private
+      local bAlreadyChallenged = (GetChallengeIndex(player:GetName()) ~= nil)
+      local bAlreadyDuelling = (GetDuelIndex(player:GetName()) ~= nil)
+      if (not bAlreadyChallenged and not bAlreadyDuelling and PlayerHasCard(player)) then
+         pUnit:GossipCreateMenu(70001, player, 0) --Starting a duel, eh? Well, do you want it to be a public or private match?
+         pUnit:GossipMenuAddItem(0, "I'd like to play in the Public Duel Field.", 20, 0)
+         pUnit:GossipMenuAddItem(0, "I'd prefer a Private Duel Field.", 21, 0)
+         pUnit:GossipMenuAddItem(0, "Tell me what else I can do...", 2, 0)
+         pUnit:GossipSendMenu(player)
+      else
+         pUnit:GossipCreateMenu(70002, player, 0) --You can't start a duel right now. You either have no Duel Creatures cards or are already involved in a challenge.
+         pUnit:GossipMenuAddItem(0, "Alright.", 1, 0)
+         pUnit:GossipSendMenu(player)
+      end
+   elseif (intid == 11) then
+      GenerateSpectatorList(pUnit, 0, player)
+   elseif (intid == 20 or intid == 21) then
+      --20 -> 21 = getting opponent's name
+      if (intid == 20 and (GetDuelByPhaseIndex(0) ~= nil or GetChallengeByPhaseIndex(0) ~= nil)) then
+         pUnit:GossipCreateMenu(70007, player, 0) --Someone's already claimed the public field. Please wait until it's over or reconsider your options.
+         pUnit:GossipMenuAddItem(0, "Alright, show me my options again.", 3, 0)
+         pUnit:GossipMenuAddItem(0, "Never mind, I'll wait.", 1, 0)
+         pUnit:GossipSendMenu(player)
+         return
+      end
+      pUnit:GossipCreateMenu(70004, player, 0) --Alright, now tell me who you want to duel with. It's case sensitive, by the way, so make sure you tell me EXACTLY the right name.
+      pUnit:GossipMenuAddItem(0, "My opponent's name is...", intid + 10, 1)
+      pUnit:GossipMenuAddItem(0, "Wait, I've changed my mind.", 3, 0)
+      pUnit:GossipSendMenu(player)
+   elseif (intid == 30 or intid == 31) then
+      --30 -> 31 = finding opponent
+      local pOpp = GetPlayer(code)
+      if (not pOpp or code == player:GetName()) then
+         --the player doesn't exist/isn't online.
+         pUnit:GossipCreateMenu(70005, player, 0) --Sorry, that player doesn't exist or is not currently online. Please check the name was correct, or try another.
+         pUnit:GossipMenuAddItem(0, "My opponent's name is...", intid, 1)
+         pUnit:GossipMenuAddItem(0, "Wait, I've changed my mind.", 3, 0)
+         pUnit:GossipSendMenu(player)
+      elseif (GetDuelIndex(code) ~= nil or GetChallengeIndex(code) ~= nil) then
+         pUnit:GossipCreateMenu(70008, player, 0) --Sorry, that player is already challenged or already duelling. Try again later, or pick another opponent.
+         pUnit:GossipMenuAddItem(0, "My opponent's name is...", intid, 1)
+         pUnit:GossipMenuAddItem(0, "Wait, I've changed my mind.", 3, 0)
+         pUnit:GossipSendMenu(player)
+      else
+         --we found a player!
+         local ref = CreateLuaEvent(function() EventChallengeTimeout(player:GetName(), code) end, nDuelTimeout, 1)
+         local nPhaseI = PHASEINDEX
+         if (intid == 30) then 
+            nPhaseI = 0
+         else
+            PHASEINDEX = PHASEINDEX + 1
+         end
+         table.insert(CHALLENGES, {player:GetName(), code, ref, nPhaseI})
+         pUnit:SendChatMessageToPlayer(15, 0, "Hey! "..player:GetName().." has challenged you to a Duel. You've got a minute to respond to the challenge, mate.", pOpp)
+         pOpp:SendAreaTriggerMessage("You've been challenged to a duel by "..player:GetName().."!")
+         pOpp:SendBroadcastMessage("Type #accept or #decline to respond to the challenge.")
+         pOpp:PlaySoundToPlayer(nChallengeSound)
+         pUnit:GossipCreateMenu(70006, player, 0) --I found your opponent. Now just hang around until they accept or decline.
+         pUnit:GossipMenuAddItem(0, "Thanks.", 1, 0)
+         pUnit:GossipSendMenu(player)
+      end
+   elseif (intid > 100 and intid < 300) then
+      --spectating
+      if (SeatPlayer(player, intid - 100) == false) then
+         pUnit:GossipCreateMenu(70009, player, 0) --That duel is full! Pick another.
+         pUnit:GossipMenuAddItem(0, "Alright.", 1, 0)
+         pUnit:GossipSendMenu(player)
+      end
+   elseif (intid > 300 and intid < 400) then --more (next page)
+      local page = intid - 300
+      GenerateSpectatorList(pUnit, page, player)
+   elseif (intid > 400) then --back (page)
+      local page = intid - 400
+      GenerateSpectatorList(pUnit, page, player)
+   end
+end
+
+function HandleDCChats1(event, player, message, ctype, lang, misc)
+   message = message:lower()
+   if (message == "#accept") then
+      local index, bIsChallenger = GetChallengeIndex(player:GetName())
+      --if we have a challenge, and are the Challengee
+      if (index ~= nil and not bIsChallenger) then
+         DestroyLuaEvent(CHALLENGES[index][3])
+         local nPhaseI = CHALLENGES[index][4]
+         local sOther = CHALLENGES[index][1]
+         CHALLENGES[index] = nil
+         player:SendBroadcastMessage("Challenge accepted.")
+         local pOther = GetPlayer(sOther)
+         if (pOther) then
+            if (PlayerHasCard(player)) then
+               pOther:SendBroadcastMessage(player:GetName().." has accepted your challenge.")
+               SetupDuelists(sOther, player:GetName(), nPhaseI)
+            else
+               pOther:SendBroadcastMessage(player:GetName().." doesn't have any Duel Creatures cards! Challenge aborted.")
+               player:SendBroadcastMessage("You don't have any Duel Creatures cards, challenge aborted.")
+            end
+         else
+            player:SendBroadcastMessage("The challenger has logged out. Challenge aborted.")
+         end
+         return false
+      end
+   elseif (message == "#decline") then
+      local index, bIsChallenger = GetChallengeIndex(player:GetName())
+      --if we have a challenge, and are the Challengee
+      if (index ~= nil and not bIsChallenger) then
+         DestroyLuaEvent(CHALLENGES[index][3])
+         local sOther = CHALLENGES[index][1]
+         CHALLENGES[index] = nil
+         player:SendBroadcastMessage("Challenge declined.")
+         player:PlaySoundToPlayer(nDeclineSound)
+         local pOther = GetPlayer(sOther)
+         if (pOther) then
+            pOther:SendBroadcastMessage(player:GetName().." has declined your challenge.")
+            pOther:PlaySoundToPlayer(nDeclineSound)
+         else
+            player:SendBroadcastMessage("The challenger has logged out. Challenge aborted.")
+         end
+         return false
+      end
+   elseif (message == "#leave") then
+      local nSeat, index = GetPlayerSeat(player:GetName())
+      if (nSeat ~= nil) then
+         local x,y,z = player:GetLocation()
+         local pSeat = player:GetGameObjectNearestCoords(x, y, z, nSeatEntry)
+         if (not pSeat) then return 1; end
+         pSeat:Despawn(5, 0)
+         player:SetStandState(0)
+         player:SetPhase(1)
+         player:SetPlayerLock(false)
+         DUELS[index][4][nSeat] = nil
+         return false
+      end
+   end
+end
+
+function EventChallengeTimeout(sChallenger, sOpp)
+   local index = GetChallengeIndex(sChallenger)
+   CHALLENGES[index] = nil
+   local player = GetPlayer(sOpp)
+   if (player) then
+      player:SendBroadcastMessage("Challenge timed out (declined).")
+      player:PlaySoundToPlayer(nDeclineSound)
+   end
+   local pOther = GetPlayer(sChallenger)
+   if (pOther) then
+      pOther:SendBroadcastMessage(sOpp.." has declined your challenge (timed out).")
+      pOther:PlaySoundToPlayer(nDeclineSound)
+   end
+end
+
+function GenerateSpectatorList(pUnit, page, player)
+   pUnit:GossipCreateMenu(70003, player, 0) --Spectating a duel, eh? Well, here's the list of duels currently going.
+   local bNextPage = true
+   for i = 10*page + 1, 10*page + 10 do
+      if (DUELS[i] ~= nil) then 
+         if (DUELS[i][3] ~= 0) then --don't allow spectation of the public field.
+            pUnit:GossipMenuAddItem(0, DUELS[i][1].." vs. "..DUELS[i][2], 100 + DUELS[i][3], 0)
+         end
+      else
+         bNextPage = false
+         break
+      end
+   end
+   if (bNextPage and DUELS[10*page+11] ~= nil) then
+      pUnit:GossipMenuAddItem(0, "More...", 300 + page + 1, 0)
+   end
+   if (page > 0) then
+      pUnit:GossipMenuAddItem(0, "Back...", 400 + page - 1, 0)
+   end
+   pUnit:GossipSendMenu(player)
+end
+
+function SetupDuelists(sP1, sP2, nPhaseIndex)
+   local pP1 = GetPlayer(sP1)
+   local pP2 = GetPlayer(sP2)
+   if (not pP1 or not pP2) then return; end
+   table.insert(DUELS, { sP1, sP2, nPhaseIndex, {}, 0, true, {} })
+   pP1:Teleport(unpack(vP1Coords)); pP2:Teleport(unpack(vP2Coords))
+   pP1:SetFacing(vP1Coords[5]); pP2:SetFacing(vP2Coords[5])
+   pP1:Root(); pP2:Root(); pP1:SetPacified(true); pP2:SetPacified(true);
+   local phase = math.pow(2, nPhaseIndex)
+   pP1:SetPhase(phase); pP2:SetPhase(phase)
+   pP1:SetUInt32Value(UNIT_FIELD_FLAGS, UNIT_FLAG_NOT_ATTACKABLE_2); pP2:SetUInt32Value(UNIT_FIELD_FLAGS, UNIT_FLAG_NOT_ATTACKABLE_2)
+   SendMsg(pP1, "Welcome duelists. Firstly, identify yourselves by activating the Duelist Console.")
+   SendMsg(pP2, "Welcome duelists. Firstly, identify yourselves by activating the Duelist Console.")
+end
+
+function SeatPlayer(player, nPhaseI, pUnit)
+   local x,y,z,o,nSeat = FindFreeSeat(nPhaseI)
+   local index = GetDuelByPhaseIndex(nPhaseI)
+   if (x ~= nil) then
+      player:Teleport(vP1Coords[1], x, y, z) --you'll always be in the same map as the Dueller... we'll use that map id
+      player:SetFacing(o)
+      player:SetPlayerLock(true)
+      local phase = math.pow(2, nPhaseI)
+      player:SetPhase(phase)
+      local function delay200()
+         player:SpawnGameObject(nSeatEntry,x,y,z,o,0,100,phase)
+         player:SetStandState(5)
+      end
+      player:CreateLuaEvent(delay200, 200, 1)
+      DUELS[index][4][nSeat] = player:GetName()
+      return true
+   else
+      return false
+   end
+end
+
+function HandleDCLogout1(e, player)
+   local nSeat = GetPlayerSeat(player:GetName())
+   if (nSeat ~= nil) then
+      HandleDCChats1(nil, player, "#leave") --leave seat
+   end
+end
+
+RegisterUnitGossipEvent(nManager, 1, OnGossip)
+RegisterUnitGossipEvent(nManager, 2, OnGossipSel)
+RegisterUnitEvent(nManager, 18, function(p) p:SetUInt32Value(UNIT_FIELD_FLAGS, UNIT_FLAG_NOT_ATTACKABLE_2) end)
+RegisterServerHook(16, HandleDCChats1)
+RegisterServerHook(13, HandleDCLogout1)

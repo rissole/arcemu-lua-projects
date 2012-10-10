@@ -1,0 +1,28 @@
+-----------------------
+--Made by Hypersniper--
+-----Project Ronin-----
+-----------------------
+
+local ALLOWED_ZONES = {268, 16, 331, 44, 45}
+
+local function OnZone(event, player, newZone, oldZone)
+   if (player:IsGm()) then return; end
+   local bPermitted = false
+
+   for _, zone in pairs(ALLOWED_ZONES) do
+      if (zone == newZone) then
+         bPermitted = true
+         break
+      end
+   end
+
+   if (bPermitted == false) then
+      player:SendBroadcastMessage("You are not permitted to enter this zone!")
+      --what happens here? where do we move them if they're not permitted?
+      --for now just hearth.
+      player:CastSpell(8690)
+   end
+end
+
+RegisterServerHook(15, OnZone)
+

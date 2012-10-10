@@ -1,0 +1,49 @@
+function donorbook_OnGossipTalk(item, event, player, pMisc)	
+	item:GossipCreateMenu(3545, player, 0)
+	item:GossipMenuAddItem(3, "Cast Stealth", 1, 0)
+	item:GossipMenuAddItem(3, "Cast Pyroblast", 2, 0)
+	item:GossipMenuAddItem(3, "Cast Death Grip", 3, 0)
+	item:GossipMenuAddItem(3, "Cast Hammer of Justice", 4, 0)
+	item:GossipSendMenu(player)
+end
+
+function donorbook_OnGossipSelect(item, event, player, id, intid, code, pMisc)
+	if(intid == 1) then
+		player:CastSpell(1787)
+		player:GossipComplete()
+	end
+
+        if(intid == 2) then
+        	local sel = player:GetRandomEnemy()
+        	if (sel ~= nil) then
+            		player:FullCastSpellOnTarget(31263, sel)
+        	else
+           		player:SendAreaTriggerMessage("You need a target")
+        	end
+                player:GossipComplete()
+	end
+
+        if(intid == 3) then
+        	local sel = player:GetRandomEnemy()
+        	if (sel ~= nil) then
+            		player:FullCastSpellOnTarget(49576, sel)
+        	else
+            		player:SendAreaTriggerMessage("You need a target")
+        	end
+                player:GossipComplete()
+	end
+
+        if(intid == 4) then
+        	local sel = player:GetRandomEnemy()
+        	if (sel ~= nil) then
+            		player:FullCastSpellOnTarget(32416, sel)
+        	else
+            		player:SendAreaTriggerMessage("You need a target")
+        	end
+	player:GossipComplete()
+	end
+end
+
+
+RegisterItemGossipEvent(74772, 1, "donorbook_OnGossipTalk")
+RegisterItemGossipEvent(74772, 2, "donorbook_OnGossipSelect")

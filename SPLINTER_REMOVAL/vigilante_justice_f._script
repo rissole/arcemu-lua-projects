@@ -1,0 +1,464 @@
+-----------------------
+--Made by Hypersniper--
+-----Project Ronin-----
+-----------------------
+
+local mod = getfenv(1)
+assert(type(mod) == "table", "Critical error, parent module missing!")
+module(mod._NAME..".VIGILANTE_JUSTICE", package.seeall)
+local self = getfenv(1)
+self.units = {}
+local DEBUG = 1
+local function Debug(m) if (DEBUG) then print(m); end; end
+
+--------------------------
+
+local nShizu = 168
+local nVigilanteJustice = 36
+local nRen = 170
+local nSplinterDoor = 422
+local nSplinterDoorLever = 448
+
+local shizu_path_coords = {
+   {2339.73,-2555.56,102.77,3.75},
+   {2336.09,-2558.12,102.77,2.29},
+   {2328.34,-2545.14,101.34,0.85},
+   {2338.16,-2533.02,101.89,0.19},
+   {2356.60,-2529.26,103.24,0.21},
+   {2369.00,-2524.92,108.45,0.36}
+}
+
+local shizu_enter_cave_coords = {
+   {2377.39,-2526.15,110.71,6.21},
+   {2384.11,-2523.37,111.30,0.39}
+}
+
+local door_close_trigger = {2392.73,-2522.61,111.29}
+
+--------------------------
+----- Part 2
+
+local nLowlifeBrute = 176
+local nCrassThug = 177
+local nRegik = 178
+
+local shizu_check_coords = {2489.15, -2494.10, 112.51}
+local regik_sight_coords = {2481.52, -2483.25, 114.28}
+local lowlife_brutes_coords = {
+   {2464.20,-2467.89,109.51,5.41},
+   {2479.60,-2480.92,114.10,5.61}
+}
+local shizu_exit_coords = {
+   {2489.07,-2492.88,112.71,5.19},
+   {2493.97,-2503.99,110.07,5.10},
+   {2483.61,-2518.90,108.67,3.90},
+   {2473.83,-2521.24,108.91,3.44}
+}
+local lowlife_brute_spawn = {2495.98, -2462.91, 108.80, 3.34}
+
+--------------------------
+
+function HyperActivate(pGo, bOpen)
+   if (bOpen) then bOpen = 0; else bOpen = 1; end
+   local flag = 0
+   pGo:SetUInt32Value(17, bOpen) --GAMEOBJECT_BYTES_1
+   pGo:SetUInt32Value(9, flag) --GAMEOBJECT_FLAGS
+   Debug("Activated game object #"..pGo:GetEntry().."; opening?: "..bOpen.."; setting GAMEOBJECT_FLAGS to "..flag)
+end
+
+function Shizu_OnSpawn(pUnit)
+   pUnit:SetUInt32Value(mod.UNIT_NPC_FLAGS, 0x03)
+end
+
+function OnQuestAccept(event, player, id, pUnit)
+   if (id == nVigilanteJustice) then
+      self.units = {}
+      self.units.player = player
+      self.units.shizu = pUnit
+      Debug("set player to "..tostring(player).."; set shizu to "..tostring(pUnit))
+      pUnit:SetUInt32Value(mod.UNIT_NPC_FLAGS, 0)
+      local path = PathLib.Create(pUnit, 2.5, shizu_path_coords, Shizu_Node)
+      path:StartPath()
+   end
+end
+
+function Shizu_Node(path)
+   local pUnit = path.unit
+   if (path.currentNode == #(path.coords) - 1) then
+      pUnit:CastSpell(22766) --sneak
+   elseif (path.currentNode == #(path.coords)) then
+      local pRen = mod.GetCreatureInRange(pUnit, nRen)
+      self.units.ren = pRen
+	  Debug("set ren to "..tostring(pRen))
+      pRen:RegisterEvent(Ren_CheckNearbyPlayers, 500, 0)
+      pUnit:RegisterEvent(Shizu_Despawn, 120000, 1)
+   end
+   path:Continue(true)
+end
+
+function Shizu_Despawn(pUnit)
+   Debug("shizu_despawn fired!")
+   if (#(self.units) == 0) then Debug("returning; there are no units!") return; end
+   pUnit:Despawn(5, 5)
+   if (self.units.ren) then Debug("despawning ren"); self.units.ren:Despawn(5, 5); end
+   if (self.units.regik and self.units.regik:IsAlive()) then
+      Debug("initiating Regik Despawn");
+      Regik_Despawn(self.units.regik)
+   end
+   self.units = {}
+   Debug("cleared units");
+end
+
+function Ren_CheckNearbyPlayers(pUnit)
+   local p = pUnit:GetClosestPlayer()
+   if (p and pUnit:GetDistanceYards(p) <= 10) then
+      pUnit:SendChatMessage(12, 0, "Who goes there?")
+      pUnit:RemoveEvents()
+   end
+end
+
+function Ren_OnGossip(pUnit, e, player)
+   pUnit:GossipCreateMenu(21, player, 0) --I'm not allowed to let anyone but Splinters inside!
+   if (tostring(self.units.player) == tostring(player) and self.units.ren) then
+      pUnit:GossipMenuAddItem(0, "You don't recognize me?", 2, 0)
+      pUnit:GossipMenuAddItem(0, "Splinters?", 3, 0)
+   end
+   pUnit:GossipSendMenu(player)
+end
+
+function Ren_OnGossipSel(pUnit, e, player, id, intid, code)
+   if (intid == 2) then
+      pUnit:GossipCreateMenu(22, player, 0) --Mmmm... nope. I don't know who you are.
+      pUnit:GossipMenuAddItem(0, "I'm new, Regik wanted to see me.", 4, 0)
+      pUnit:GossipMenuAddItem(0, "Look again, Ren.", 5, 0)
+      pUnit:GossipSendMenu(player)
+   elseif (intid == 3) then
+      pUnit:GossipCreateMenu(23, player, 0) --The Bloody Splinters, duh! We're the toughest group around here, and don't you forget it. Now beat it!
+      pUnit:GossipSendMenu(player)
+   elseif (intid == 4) then
+      pUnit:GossipCreateMenu(24, player, 0) --Liar! Regik doesn't let anyone new in here! Now scram!
+      pUnit:GossipSendMenu(player)
+   elseif (intid == 5) then
+      pUnit:GossipCreateMenu(25, player, 0) --Hmmm, you actually look a little like... no...
+      pUnit:GossipMenuAddItem(0, "What kind of guard are you if you can't recognize a fellow member!?", 6, 0)
+      pUnit:GossipSendMenu(player)
+   elseif (intid == 6) then
+      pUnit:GossipCreateMenu(26, player, 0) --Shut up! It's just damn hard to see you with the window up so high! You hold still for a second alright?
+      pUnit:GossipMenuAddItem(0, "Fine...", 7, 0)
+      pUnit:GossipSendMenu(player)
+   elseif (intid == 7) then
+      Ren_EntranceEvent(pUnit, player)
+   end
+end
+
+function Ren_EntranceEvent(pUnit, player)
+   Debug("entrance event started!");
+   player:SetPlayerLock(true)
+   pUnit:SetUInt32Value(mod.UNIT_NPC_FLAGS, 0)
+   local door = pUnit:GetGameObjectNearestCoords(pUnit:GetX(), pUnit:GetY(), pUnit:GetZ(), nSplinterDoor)
+   HyperActivate(door, true)
+   Debug("opened door")
+   self.units.shizu:SetUnitToFollow(0, 1, 1) --this means stop following
+   self.units.shizu:RemoveEvents()
+   local path = PathLib.Create(self.units.shizu, 2.5, shizu_enter_cave_coords)
+   path:StartPath()
+   local function shizuattackdelay()
+      self.units.shizu:RemoveAllAuras()
+      self.units.shizu:AttackReaction(pUnit, 1, 0)
+   end
+   local function tauntdelay()
+      if (not player:IsInWorld()) then Shizu_Despawn(self.units.shizu); return; end
+      local race = mod.Race[player:GetPlayerRace()]
+      pUnit:SendChatMessage(12, 0, "Stupid "..race..", thinking they could get into our hideout!")
+      pUnit:EventChat(12, 0, "What an idi---", 5000)
+      pUnit:RegisterEvent(shizuattackdelay, 7000, 1)
+   end
+   local function chatdelay()
+      pUnit:SendChatMessage(12, 0, "Nope, there's no way you're a Splinter! Nice try, but it'll take more than that to trick me!")
+      HyperActivate(door, false)
+      pUnit:RegisterEvent(tauntdelay, 5000, 1)
+   end
+   local function emotedelay()
+      pUnit:Emote(16, 3000)
+      pUnit:SendChatMessage(16, 0, pUnit:GetName().." looks you up and down suspiciously.")
+      pUnit:RegisterEvent(chatdelay, 3000, 1)
+   end
+   local function hmmdelay()
+      pUnit:SendChatMessage(12, 0, "Hmmm...")
+      pUnit:RegisterEvent(emotedelay, 3000, 1)
+   end
+   pUnit:RegisterEvent(hmmdelay, 2000, 1) --start here -> read upwards
+end
+
+function Ren_OnDie(pUnit, e, pKiller)
+   --we only want shizu to follow the player if shizu killed Ren.
+   Debug("Regik's dead.")
+   if (not self.units.player or not self.units.player:IsInWorld()) then Shizu_Despawn(self.units.shizu); return; end
+   if (tostring(self.units.shizu) == tostring(pKiller)) then
+      Debug("shizu killed him. -> "..tostring(self.units.shizu:GetEntry()))
+      local function doordelay()
+         local door = pUnit:GetGameObjectNearestCoords(pUnit:GetX(), pUnit:GetY(), pUnit:GetZ(), nSplinterDoor)
+         HyperActivate(door, true)
+         self.units.shizu = mod.GetCreatureInRange(pUnit, nShizu)
+         self.units.player:SetPlayerLock(0)
+         self.units.shizu:ModifyWalkSpeed(8)
+         door:CreateLuaEvent(Door_Close_Trigger, 500, 0)
+         Shizu_FollowPlayer(self.units.shizu)
+      end
+      CreateLuaEvent(doordelay, 3000, 1)
+   end
+end
+
+function Door_Close_Trigger()
+   local player = self.units.player
+   if (not player or not player:IsInWorld()) then return; end
+   local x,y,z,o = player:GetLocation()
+   local x2,y2,z2 = unpack(door_close_trigger)
+   if (PathLib._DistToPoint(x,y,z,o,x2,y2,z2,0) <= 2) then
+      local door = player:GetGameObjectNearestCoords(x2, y2, z2, nSplinterDoor)
+      HyperActivate(door, false)
+      door:RemoveEvents()
+   end
+end
+
+function Shizu_FollowPlayer(pUnit)
+   local player = self.units.player
+   if (not player or not player:IsInWorld()) then Shizu_Despawn(pUnit); return; end
+   pUnit:SetUnitToFollow(player, 3, 1)
+   pUnit:EventCastSpell(pUnit, 22766, 2000, 1) --sneak
+   pUnit:RegisterEvent(Shizu_CombatPulse, 500, 0)
+end
+
+function Shizu_CombatPulse(pUnit)
+   local player = self.units.player
+   if (not player or not player:IsInWorld() or player:IsDead()) then Shizu_Despawn(pUnit); return; end
+   --if (pUnit:GetDistanceYards(player) > 50 or pUnit:GetX() < 2230) then pUnit:SendChatMessage(12, 0, "If you're running away now, I'm out too."); Shizu_Despawn(pUnit); return; end
+   local pT = player:GetPrimaryCombatTarget()
+   if (pT and pT ~= 0) then
+      pUnit:AttackReaction(pT, 1, 0)
+      return
+   end
+   if (not self.units.regik) then
+      Shizu_CheckForPart2(pUnit)
+   end
+end
+
+function Shizu_OnCombat(pUnit)
+   pUnit:RemoveEvents()
+   pUnit:SetUnitToFollow(0, 1, 1)
+   pUnit:RemoveAllAuras()
+   if (self.units.regik) then
+      self.units.regik:SendChatMessage(12, 0, "Oh so you brought a sneaky little friend too? Make sure to take her alive!")
+   end
+end
+
+function Lever_Use(pGo, event, player)
+   local door = pGo:GetGameObjectNearestCoords(pGo:GetX(), pGo:GetY(), pGo:GetZ(), nSplinterDoor)
+   HyperActivate(door, true)
+   HyperActivate(pGo, false)
+   local function close()
+      HyperActivate(door, false)
+      HyperActivate(pGo, false)
+      pGo:SetUInt32Value(9, 0x0) --clickable.
+   end
+   pGo:CreateLuaEvent(close, 3000, 1)
+end
+
+------------------------------------------------------------------
+----- Part 2
+------------------------------------------------------------------
+
+function Regik_Despawn(pUnit)
+   pUnit:Despawn(5, 5)
+   for k,v in pairs(pUnit:GetInRangeUnits()) do
+      if (v:GetEntry() == nCrassThug) then
+         v:Despawn(5, 5)
+      elseif (v:GetEntry() == nLowlifeBrute) then
+         v:Despawn(5, 0)
+      end
+   end
+end
+
+function Shizu_ReturnToFollow(pUnit)
+   local player = self.units.player
+   if (not player or not player:IsInWorld()) then Shizu_Despawn(pUnit); return; end
+   Shizu_FollowPlayer(pUnit)
+   local race = mod.Race[player:GetPlayerRace()]
+   pUnit:SendChatMessageToPlayer(15, 0, "Regik is just around the corner, but he's surrounded by his cronies... get ready "..race..", this is going to get rough.", player)
+end
+
+function Regik_OnSpawn(pUnit)
+   pUnit:SetCombatCapable(1)
+   pUnit:SetUInt32Value(mod.UNIT_FIELD_FLAGS, 0x02) --unattackable
+end
+
+function Shizu_CheckForPart2(pUnit)
+   pUnit:RemoveEvents()
+   pUnit:SetUnitToFollow(0, 1, 1)
+   local player = self.units.player
+   local x, y, z = player:GetLocation()
+   local tx, ty, tz = unpack(shizu_check_coords)
+   if (PathLib._DistToPoint(x,y,z,0,tx,ty,tz,0) <= 2) then
+      local xt, yt, zt = unpack(regik_sight_coords)
+      pUnit:SendChatMessageToPlayer(15, 0, "I hear voices up ahead, stay here.", player)
+      pUnit:MoveTo(xt, yt, zt, -math.pi)
+      local t = PathLib._TimeToPoint(pUnit:GetX(), pUnit:GetY(), pUnit:GetZ(), 0, xt, yt, zt, 0)
+      pUnit:RegisterEvent(Shizu_ReturnToFollow, t+2000, 1)
+   else
+      tx, ty, tz = unpack(regik_sight_coords)
+      if (PathLib._DistToPoint(x,y,z,0,tx,ty,tz,0) <= 2) then
+         pUnit:RemoveEvents()
+         Shizu_FollowPlayer(pUnit)
+         local pRegik = mod.GetInRangeCreature(pUnit, nRegik)
+         self.units.regik = pRegik
+         self.units.crasses = {}
+         pRegik:SetStandState(0)
+         pRegik:SendChatMessage(14, 0, "Another imbecile trying to take me down, eh? Make 'em bleed, boys!")
+         for k,v in pairs(pUnit:GetInRangeUnits()) do
+            if (v:GetEntry() == nCrassThug and v:IsAlive()) then
+               table.insert(self.units.crasses, v)
+            end
+         end
+         pRegik:RegisterEvent(Crass_Attack, 10000, 3)
+         pRegik:RegisterEvent(Lowlifes_Attack, 15000, 5)
+         pRegik:RegisterEvent(Regik_CriteriaReached, 120000, 1)
+      end
+   end
+end
+
+function Crass_Attack(pUnit)
+   local player = self.units.player
+   if (not player or not player:IsInWorld()) then Shizu_Despawn(self.units.shizu); return; end
+   if (self.units.crasses[1]) then
+      self.units.crasses[1]:AttackReaction(player, 1, 0)
+      table.remove(self.units.crasses, 1)
+   end
+end
+
+function Lowlifes_Attack(pUnit)
+   local player = self.units.player
+   if (not player or not player:IsInWorld()) then Shizu_Despawn(self.units.shizu); return; end
+   local function Lowlifes_OnNode(path)
+      if (path.currentNode == #(path.coords)) then
+         local player = self.units.player
+         if (not player or not player:IsInWorld()) then Shizu_Despawn(self.units.shizu); return; end
+         path.unit:AttackReaction(player, 1, 0)
+      end
+      path:Continue(true)
+   end
+   local x,y,z,o = unpack(lowlife_brute_spawn)
+   for i=1,7 do
+      local u = pUnit:SpawnCreature(nLowlifeBrute, x, y, z, o, pUnit:GetFaction(), 0)
+      local path = PathLib.Create(u, 6+math.random(0,3), lowlife_brutes_coords, Lowlifes_OnNode)
+      path:StartPath()
+   end
+end
+
+function UpdateDeadUnits(pUnit)
+   self.units.criteria = (self.units.criteria or 0) + 1
+   if (self.units.criteria == 38) then --3 thugs + 5 waves of 7 brute
+      Regik_CriteriaReached(self.units.regik)
+      UpdateDeadUnits = function() return; end
+      return
+   end
+end
+
+function Regik_CriteriaReached(pUnit)
+   pUnit:RemoveEvents()
+   pUnit:SendChatMessage(12, 0, "Useless! All of you!")
+   pUnit:Emote(5, 1500)
+   for k,v in pairs(pUnit:GetInRangeUnits()) do
+      if ((v:GetEntry() == nCrassThug or v:GetEntry() == nLowlifeBrute) and v:IsAlive()) then
+         local respawntime = 0
+         if (v:GetEntry() == nCrassThug) then respawntime = 120000; end
+         v:Despawn(5, respawntime)
+      end
+   end
+   self.units.crasses = {}
+   self.units.criteria = 0
+   local function engagedelay()
+      local player = self.units.player
+      if (not player or not player:IsInWorld()) then Shizu_Despawn(self.units.shizu); return; end
+      pUnit:SetCombatCapable(0)
+      pUnit:SetUInt32Value(mod.UNIT_FIELD_FLAGS, 0)
+      pUnit:AttackReaction(player, 1, 0)
+   end
+   local function chat2delay()
+      pUnit:SendChatMessage(12, 0, "Fine, I'll just have to take care of you myself!")
+      pUnit:Emote(1, 1500)
+      pUnit:RegisterEvent(engagedelay, 5000, 1)
+   end
+   local function sighdelay()
+      pUnit:SendChatMessage(16, 0, pUnit:GetName().." sighs.")
+      pUnit:RegisterEvent(chat2delay, 5000, 1)
+   end
+   pUnit:RegisterEvent(sighdelay, 5000, 1) --start here -> read up
+end
+
+function Regik_OnCombat(pUnit, e, player)
+   self.units[tostring(pUnit)] = {}
+   pUnit:CastSpell(16789) --rage
+   pUnit:CastSpellOnTarget(31994, player) --shoulder charge
+   local function BrokenBones()
+      pUnit:CastSpellOnTarget(62354, player) --broken bones
+   end
+   local function _50pHP()
+      if (pUnit:GetHealthPct() <= 50 and not self.units[tostring(pUnit)]._50) then
+         pUnit:CastSpellOnTarget(48288, player) --Mace Smash
+         self.units[tostring(pUnit)]._50 = true
+      end
+   end
+   local function _25pHP()
+      if (pUnit:GetHealthPct() <= 25 and not self.units[tostring(pUnit)]._25) then
+         pUnit:CastSpellOnTarget(29555, player) --left hook
+         self.units[tostring(pUnit)]._25 = true
+      end
+   end
+   pUnit:RegisterEvent(BrokenBones, 10000, 1)
+   pUnit:RegisterEvent(_50pHP, 1000, 0)
+   pUnit:RegisterEvent(_25pHP, 1000, 0)
+end
+
+function Regik_OnDeath(pUnit)
+   local player = self.units.player
+   if (not player or not player:IsInWorld()) then Shizu_Despawn(self.units.shizu); return; end
+   local pShizu = self.units.shizu
+   pShizu:RemoveEvents()
+   pShizu:RemoveAllAuras()
+   pShizu:SetUnitToFollow(0, 1, 1)
+   local ang = pShizu:CalcRadAngle(pUnit:GetX(), pUnit:GetY(), player:GetX(), player:GetY())
+   pShizu:MoveTo(pUnit:GetX() + (5 * math.cos(math.pi / 2)), pUnit:GetY() + (5 * math.sin(math.pi / 2)), pUnit:GetZ(), ang)
+   pShizu:SetUInt32Value(mod.UNIT_NPC_FLAGS, 0x03)
+   pShizu:RegisterEvent(Shizu_EndThis, 60000, 1)
+end
+
+function Shizu_EndThis(pUnit)
+   pUnit:SetUInt32Value(mod.UNIT_NPC_FLAGS, 0)
+   local function Shizu_DespawnAtEndOfPath(p)
+      if (#(p.coords) == #shizu_exit_coords) then
+         p.unit:Despawn(5, 5)
+      else
+         p:Continue(true)
+      end
+   end
+   local path = PathLib.Create(pUnit, 7, shizu_exit_coords, Shizu_DespawnAtEndOfPath)
+   pUnit:StartPath(path)
+end
+
+RegisterGameObjectEvent(nSplinterDoorLever, 4, Lever_Use)
+RegisterUnitEvent(nShizu, 18, Shizu_OnSpawn)
+RegisterUnitEvent(nShizu, 1, Shizu_OnEnterCombat)
+RegisterUnitEvent(nShizu, 2, Shizu_FollowPlayer)
+RegisterUnitEvent(nRen, 4, Ren_OnDie)
+RegisterUnitGossipEvent(nRen, 1, Ren_OnGossip)
+RegisterUnitGossipEvent(nRen, 2, Ren_OnGossipSel)
+RegisterServerHook(14, OnQuestAccept)
+----- Part 2
+RegisterUnitEvent(nCrassThug, 3, UpdateDeadUnits)
+RegisterUnitEvent(nLowlifeBrute, 3, UpdateDeadUnits)
+RegisterUnitEvent(nCrassThug, 2, Regik_Despawn)
+RegisterUnitEvent(nLowlifeBrute, 2, Regik_Despawn)
+RegisterUnitEvent(nRegik, 18, Regik_OnSpawn)
+RegisterUnitEvent(nRegik, 1, Regik_OnCombat)
+RegisterUnitEvent(nRegik, 2, Regik_Despawn)
+RegisterUnitEvent(nRegik, 3, Regik_OnDeath)

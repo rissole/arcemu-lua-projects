@@ -1,0 +1,17 @@
+MONSTROSITY = {}
+local entry = 555
+local MIN_KILLS_TO_TALK = 2
+
+function MONSTROSITY.OnKill(pUnit, event)
+   local sUnit = tostring(pUnit)
+   if (MONSTROSITY[sUnit] == nil) then 
+      MONSTROSITY[sUnit] = {}
+      MONSTROSITY[sUnit].killsCount = 0
+   end
+   MONSTROSITY[sUnit].killsCount = MONSTROSITY[sUnit].killsCount + 1
+   if (MONSTROSITY[sUnit].killsCount > MIN_KILLS_TO_TALK) then
+      pUnit:SendChatMessage(14, 0, "RAWR! I have killed many people!")
+   end
+end
+
+RegisterUnitEvent(entry, 3, "MONSTROSITY.OnKill")

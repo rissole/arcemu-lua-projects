@@ -1,0 +1,35 @@
+local entry = 70000
+
+local GOLD = 10000
+
+local items = {
+  {22736, "Andonisus, Reaper of Souls", 50*GOLD},
+  {13262, "Ashbringer", 55*GOLD},
+  {30316, "Devastation", 50*GOLD}
+}
+
+function FancyVendor_OnGossip(pUnit, event, player)
+   pUnit:GossipCreateMenu(65536, player, 0)
+   for i, subt in ipairs(items) do
+      pUnit:GossipMenuAddItem(0, subt[2], i, 0, "Are you sure you want to buy "..subt[2].."?", subt[3])
+   end
+   pUnit:GossipSendMenu(player)
+end
+
+function FancyVendor_OnGossipSel(pUnit, event, player, id, intid, code)
+   local subt = items[intid]
+   --subt[1]: item id; [2]: name; [3]: copper cost
+   if (player:GetCoinage() < subt[3]) then --unsuccessful - not enough money
+      player:SendAreaTriggerMessage("|cFFFF0000You can't afford that item.")
+   else
+      if (player:AddItem(subt[1], 1)) then --if they successfully get the item
+         player:DealGoldCost(subt[3])
+      else
+         player:SendAreaTriggerMessage("|cFFFF0000You don't have enough bag space.")
+      end
+   end
+   FancyVendor_OnGossip(pUnit, event, player) --resend the main menu
+end
+
+RegisterUnitGossipEvent(entry, 1, FancyVendor_OnGossip)
+RegisterUnitGossipEvent(entry, 2, FancyVendor_OnGossipSel)

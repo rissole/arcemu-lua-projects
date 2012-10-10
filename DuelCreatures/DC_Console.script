@@ -1,0 +1,903 @@
+-----------------------
+--Made by Hypersniper--
+----Duel Creatures-----
+-----------------------
+
+--Console Gossip
+
+local par = getfenv(1)
+assert(type(par) == "table", "DuelCreatures: Critical error, parent module missing!")
+module(par._NAME..".CONSOLE", package.seeall)
+local self = getfenv(1)
+setmetatable(self, {__index = par.SHARED})
+
+--PARAMETERS--
+
+nConsole = 550003
+nDeck = 70000
+nWarnSound = 600
+nDuelStartSound = 4654
+nDuelEndSound = 8573
+nStartLifepoints = 8000
+
+--END PARAMETERS--
+
+--DUELS: [nIndex] = { 1sDueller, 2sDuellee, 3nPhaseIndex, 4{seating}, 5nGamePhase, 6bFirstTurn }
+--CONSOLES: [nDuelIndex][nConsole] = { 1GO, 2sUserName, 3{deck}, 4bMyTurn, 5{hand}, 6{graveyard}, 7{lastIntIds}, 8{turnextras}, 9{RFP}, 10nLifePoints }
+--FIELDS: [nIndex] = { fieldspell, { [nConsole] = { {monsters}, {spells} } } }
+--[[turnextras: ["NS"] = (has normal summon been done, true/nil)
+                ["PC"] = (has a position been changed, true/nil)
+                ["CH"] = (choice holder)
+                ["AP"] = (is action in progress? [like attacking animation])
+  ]]
+
+--[[
+     Returns the container slot that has the Deck bag equipped, -1 if not equipped.
+--]]
+function HasDeck(player)
+   for i=19,23 do
+      local item = player:GetEquippedItemBySlot(i)
+      if (item and item:GetEntryId() == nDeck) then
+         return i
+      end
+   end
+   return -1
+end
+
+--[[
+     Returns opponent's name and their console #, or nil if no duel.
+--]]
+function GetOpponent(sName)
+   local index = GetDuelIndex(sName)
+   if (index ~= nil) then
+      if (CONSOLES[index] ~= nil) then
+         if (CONSOLES[index][1] ~= nil and CONSOLES[index][1][2] == sName) then
+            return CONSOLES[index][2][2], 2
+         elseif (CONSOLES[index][2] ~= nil and CONSOLES[index][2][2] == sName) then
+            return CONSOLES[index][1][2], 1
+         end
+      end
+   end
+   return nil
+end
+
+--[[
+     Method that ends the duel. Must provide duel index, a duelist's name and if they are the winner or not.
+--]]
+function EndDuel(index, sName, bWinner)
+   local pWinner, pLoser
+   if (bWinner) then 
+      pWinner = GetPlayer(sName)
+      pLoser = GetPlayer(GetOpponent(sName))
+   else
+      pLoser = GetPlayer(sName)
+      pWinner = GetPlayer(GetOpponent(sName))
+   end
+   if (not pWinner or not pLoser) then return; end
+   
+   --handle pWinner winning here
+   pWinner:Unroot()
+   pWinner:SetUInt32Value(UNIT_FIELD_FLAGS, 0)
+   pWinner:SetPacified(false)
+   pWinner:SetPhase(1)
+   pWinner:GossipComplete()
+   --handle pLoser losing here
+   pLoser:Unroot()
+   pLoser:SetUInt32Value(UNIT_FIELD_FLAGS, 0)
+   pLoser:SetPacified(false)
+   pLoser:SetPhase(1)
+   pLoser:GossipComplete()
+   
+   InitiateLifepoints(index, true) --true here means deinitiate.
+   SendMessageToDuel(index, pLoser:GetName().." loses! The winner is|r |cFFFF0000"..pWinner:GetName().."!", nDuelEndSound)
+   
+   for i=1,2 do --both sides of field
+      for j=1,2 do --monster and magic row
+         for k=1,5 do --each slot
+            local card = FIELDS[index][2][i][j][k]
+            if (card) then 
+               card:Delete()
+            end
+         end
+      end
+   end
+   for k,v in pairs(DUELS[index][4]) do
+      par.MANAGER.HandleDCChats1(nil, v, "#leave") --leave seat
+   end
+   CONSOLES[index][1][1]:SetByte(GAMEOBJECT_BYTES_1, 0, 1)
+   CONSOLES[index][2][1]:SetByte(GAMEOBJECT_BYTES_1, 0, 1)
+   DUELS[index] = nil
+   CONSOLES[index] = nil
+   FIELDS[index] = nil
+end
+
+--[[
+     Loads AND SHUFFLES deck.
+--]]
+--you can have a minimum of 1, and a maximum of 30 cards.
+--this count is NOT 30 /unique/ cards, but 30 cards IN TOTAL.
+--you can have a maximum of 3 of each card - handled by item Unique status
+function ShuffleDeck(index, nConsole)
+   CONSOLES[index][nConsole][3] = {} --create new deck
+   local sName = CONSOLES[index][nConsole][2]
+   local player = GetPlayer(sName)
+   if (not player) then return; end
+   --load the deck based on player cards:
+   local deckBag = HasDeck(player)
+   local nCards = 0
+   if (deckBag ~= -1) then --they have a deck
+      CONSOLES[index][nConsole][3] = GetDeckCards(player, deckBag)
+      local deck = CONSOLES[index][nConsole][3]
+      if (#deck > 30) then --more than 30 cards in your deck? we'll cut off after the first 30
+         for i=31, #deck do
+            deck[i] = nil
+         end
+      end
+      table.random(deck)
+   end
+   --v this can occur in 2 ways: player has no deck bag, or they have one with less than 30 cards in it.
+   if (#CONSOLES[index][nConsole][3] < 30) then
+      local allcards = GetAllCards(player, deckBag)
+      table.random(allcards)
+      local deck = CONSOLES[index][nConsole][3]
+      for i,v in ipairs(allcards) do
+         table.insert(deck, v)
+      end
+      if ((deckBag ~= -1 and #deck > 30) or (deckBag == -1 and #deck > 20)) then --randomise, then cut off after 20/30 depending on above comment
+         for i=21, #deck do
+            deck[i] = nil
+         end
+      end
+   end
+   --WE HAVE A DECK BASED ON PLAYER ITEMS NOW! w00t
+end
+
+--[[
+     Removes num (or 1) cards from top of deck and adds them to hand.
+     Returns true on success, or the number of drawn cards on failure.
+--]]
+function DrawCard(index, nConsole, num)
+   num = num or 1
+   local deck = CONSOLES[index][nConsole][3]
+   local hand = CONSOLES[index][nConsole][5]
+   local added = 0
+   local toremove = {}
+   for i=1, num do
+      if (deck[i]) then
+         table.insert(hand, deck[i])
+         table.insert(toremove, i)
+         added = added + 1
+      else
+         for j=#toremove,1,-1 do
+            table.remove(deck, toremove[j])
+         end
+         return added
+      end
+   end
+   for i=#toremove,1,-1 do
+      table.remove(deck, toremove[i])
+   end
+   for k=1, num do
+      CALL_CARD_EVENT(EVENTS.ON_DRAW_CARD, hand[#hand-num+k], index, nConsole) --call on the kth drawn card
+   end
+   return true
+end
+
+--[[
+     Plugs in to script section
+--]]
+function HandleStandbyPhase(index, nConsole)
+   CALL_CARD_EVENT(EVENTS.ON_STANDBY_PHASE, -1, index, nConsole)
+end
+
+--[[
+     Removes a card with the specified DCID from the hand.
+     This is a bit awkward, it just removes the first card with that DCID, which could possibly be not the card you selected;
+     the point is, it should make no difference anyway, let's see how it goes.
+--]]
+function RemoveCardFromHand(index, nConsole, dcid)
+   local hand = CONSOLES[index][nConsole][5]
+   for i,v in ipairs(hand) do
+      if (v == dcid) then
+         table.remove(hand, i)
+         return true
+      end
+   end
+   return false
+end
+
+--[[
+     Removes a card with the specified DCID from the graveyard.
+--]]
+function RemoveCardFromGraveyard(index, nConsole, dcid)
+   local gy = CONSOLES[index][nConsole][6]
+   for i,v in ipairs(gy) do
+      if (v == dcid) then
+         table.remove(gy, i)
+         return true
+      end
+   end
+   return false
+end
+
+function OnActivate(pGo, event, player)
+   local index, bIsDueller = GetDuelIndex(player:GetName())
+   local nConsole
+   if (index ~= nil) then
+      local bFirst = false
+      if (bIsDueller) then --duellER has console #1
+         nConsole = 1
+         if (CONSOLES[index] == nil) then
+            bFirst = true
+            --[nDuelIndex][nConsole] = { 1GO, 2sUserName, 3{deck}, 4bMyTurn, 5{hand}, 6{graveyard}, 7{lastIntIds}, 8{turnextras}, 9{RFP}, nLifePoints }
+            CONSOLES[index] = { [1] = { pGo, player:GetName(), {}, true, {}, {}, {}, {}, {}, nStartLifepoints } }
+            InitField(index, nConsole)
+            SendMessageToDuelists(index, "Identified player: "..player:GetName())
+         elseif (CONSOLES[index][1] == nil) then
+            bFirst = true
+            CONSOLES[index][1] = { pGo, player:GetName(), {}, true, {}, {}, {}, {}, {}, nStartLifepoints }
+            InitField(index, nConsole)
+            SendMessageToDuelists(index, "Identified player: "..player:GetName())
+         end
+      else
+         nConsole = 2
+         if (CONSOLES[index] == nil) then
+            bFirst = true
+            CONSOLES[index] = { [2] = {pGo, player:GetName(), {}, false, {}, {}, {}, {}, {}, nStartLifepoints} }
+            InitField(index, nConsole)
+            SendMessageToDuelists(index, "Identified player: "..player:GetName())
+         elseif (CONSOLES[index][2] == nil) then
+            bFirst = true
+            CONSOLES[index][2] = { pGo, player:GetName(), {}, false, {}, {}, {}, {}, {}, nStartLifepoints }
+            InitField(index, nConsole)
+            SendMessageToDuelists(index, "Identified player: "..player:GetName())
+         end
+      end
+      if (bFirst) then --first use of console
+         if (HasDeck(player) == -1) then
+            SendMsg(player, "|cFFFFFFFFWarning: You have no deck equipped! A maximum of 20 cards will be chosen at random from your bags for the game.|r", nWarnSound)
+         end
+         if (CONSOLES[index][1] and CONSOLES[index][2]) then --both duelists were just identified.
+            local function _1500ms()
+               ShuffleDeck(index, nConsole)
+               DrawCard(index, nConsole, 5) --set up hand
+               SendMessageToDuel(index, "Let the duel begin!|r", nDuelStartSound)
+               pGo:SetByte(GAMEOBJECT_BYTES_1, 0, 0) --open
+               local _, nCon = GetOpponent(player:GetName())
+               ShuffleDeck(index, nCon)
+               DrawCard(index, nCon, 5) --set up hand
+               CONSOLES[index][nCon][1]:SetByte(GAMEOBJECT_BYTES_1, 0, 0)
+               InitiateLifepoints(index)
+            end
+            SendMessageToDuelists(index, "Both duelists identified.|r")
+            CreateLuaEvent(_1500ms, 1500, 1)
+         end
+      elseif (pGo:GetByte(GAMEOBJECT_BYTES_1, 0) == 0 and CONSOLES[index][nConsole][8]["AP"] ~= true) then --not first use AND console is useable (open & not restricted)
+         local backs = CONSOLES[index][nConsole][7]
+         --the question is, when will this BE empty? answer: 
+         --1) at start of duel, 2) when we manually clear it between duel phases.
+         if (#backs > 0) then --we've used this console before, load our last menus
+            local backid = backs[#backs];
+            table.remove(backs); --that menu item will be added to the array again so let's remove it now to prevent doubles
+            OnConsoleInput(pGo, 2, player, 0, backid, "")
+            return
+         end
+         if (CONSOLES[index][nConsole][4] == true) then --it's my turn
+            MainMenu(player)
+         else --NOT MY TURN, only allow field viewing
+            OnConsoleInput(pGo, 2, player, 0, 20, "")
+         end
+      end
+   end
+end
+
+--CAUTION: HUGE FUNCTION! Look at "if (intid..." lines and their comments!
+function OnConsoleInput(pGo, event, player, id, intid, code)
+   local index, nConsole = GetDuelIndex(player:GetName()) --nConsole is actually a bool here - whether duellER or EE.
+   if (not index) then return; end
+   if (nConsole) then nConsole = 1; else nConsole = 2; end --duellER always has console 1
+   
+   if (CONSOLES[index][nConsole][8]["AP"] == true) then return; end --if we are restricted from console use, stop here.
+   --this array holds all the IntIDs used by the console since activation.
+   --the last indexes are the latest intids viewed.
+   table.insert(CONSOLES[index][nConsole][7], intid)
+   
+   -------------------------------------------------------------------------------------------------
+   if (intid == 1) then --int id 1 => button has no functionality - clicking it does nothing
+      local backs = CONSOLES[index][nConsole][7]
+      local backid = backs[#backs-1]; table.remove(backs);
+      table.remove(backs);
+      OnConsoleInput(pGo, 2, player, 0, backid, "")
+      return
+   end
+   -------------------------------------------------------------------------------------------------
+   if (intid == 1115) then
+      --when 'back' is pressed, we go back to the 2nd last array element, because we want to go BACK :)
+      --there'll always be at least 2 if we're going back, if I don't stuff up anyway.
+      local backs = CONSOLES[index][nConsole][7]
+      local backid = backs[#backs-2]; table.remove(backs);
+      table.remove(backs); table.remove(backs); --we remove twice here because the menu entry will be duplicated otherwise...
+      OnConsoleInput(pGo, 2, player, 0, backid, "") --right here. The back menu id will be entered again in this method - back logging twice.
+      return
+   end
+   -------------------------------------------------------------------------------------------------
+   if (intid == 70) then --DRAW PHASE
+      pGo:GossipCreateMenu(70010, player, 0)
+      pGo:GossipMenuAddItem(0, "Draw card", 71, 0)
+      pGo:GossipMenuAddItem(7, "Inspect hand", 5000, 0)
+      pGo:GossipMenuAddItem(7, "Inspect field", 5001, 0)
+      pGo:GossipSendMenu(player)
+   end
+   -------------------------------------------------------------------------------------------------
+   if (intid == 71) then --draw card
+      if (DrawCard(index, nConsole) ~= true) then --you've run out of cards... loser.
+         SendMessageToDuel(index, player:GetName().." ran out of cards!")
+         EndDuel(index, player:GetName(), false)
+      else --successful card draw! move on to next phase.
+         local hand = CONSOLES[index][nConsole][5]
+         local name = DC_DB_CACHE[hand[#hand]].Name
+         local colourtext = GetTypeColour(DC_DB_CACHE[hand[#hand]].Type)
+         SendMsg(player, "|cFFFFFFFFYou drew:|r "..colourtext.."["..name.."]")
+         SendMessageToDuel(index, string.format("%s draws a card.", player:GetName()))
+         HandleStandbyPhase(index, nConsole) --this is instead of a whole standby phase. only effects and stuff need to happen here.
+         NextPhase(index, nConsole)
+         return MainMenu(player)
+      end
+   end
+   -------------------------------------------------------------------------------------------------
+   if (intid == 80) then --MAIN PHASE
+      pGo:GossipCreateMenu(70013, player, 0) --Main phase: You may select cards to play now.
+      pGo:GossipMenuAddItem(7, "Inspect hand", 5004, 0) --5004: inspect hand with playable card
+      pGo:GossipMenuAddItem(7, "Inspect field", 5005, 0) --5005: inspect field with ability to change battle position/activate effects
+      if (DUELS[index][6] or DUELS[index][5] == 3) then --first turn -> no battle phase or it's Main Phase 2
+         pGo:GossipMenuAddItem(0, "End turn", 5010, 0)
+      else
+         pGo:GossipMenuAddItem(0, "Continue to Battle Phase", 107, 0)
+      end
+      pGo:GossipSendMenu(player)
+   end
+   -------------------------------------------------------------------------------------------------
+   if (intid == 81) then --normal summon
+      local backs = CONSOLES[index][nConsole][7]
+      local backid = backs[#backs-1] --what did we press before this one?
+      local dcid = backid-10000
+      if (DC_DB_CACHE[dcid].Type == CARD_TYPE.Monster) then 
+         pGo:GossipCreateMenu(70014, player, 0) --Select a slot to place the card. You must select an empty slot.
+         pGo:GossipMenuAddItem(0, "Monster Row:", 1, 0)
+         for i=1, 5 do
+            local v = FIELDS[index][2][nConsole][1][i]
+            local proto = nil
+            local mode = ""
+            local name = "Empty"
+            local iid = 81+i --82 -> 86 = select a field slot
+            local colour = ""
+            if (v) then
+               proto = v.m_proto --duel creature always has proto
+               if (v.m_mode == 0) then mode = "(ATK)"; else mode = "(DEF)"; end
+               name = proto.Name
+               colour = GetTypeColour(proto.Type)
+               if (v.m_face == 1) then name = "(Face Down) - "..proto.Name; colour = ""; end
+               iid = 1
+            end
+            pGo:GossipMenuAddItem(7, mode..colour.."["..name.."]", iid, 0)
+         end
+         pGo:GossipMenuAddItem(0, "Back", 1115, 0)
+         pGo:GossipSendMenu(player)
+      elseif (DC_DB_CACHE[dcid].Type == CARD_TYPE.Spell and DC_DB_CACHE[dcid].S_Type == SPELL_TYPE.Field) then 
+         --ACTIVATING FIELD SPELL CARD IS HERE WOOPWOOP ATTENTION ATTENTION--
+         par.FIELD.ActivateFieldSpell(index, dcid)
+         RemoveCardFromHand(index, nConsole, dcid)
+         return MainMenu(player)
+      else
+         pGo:GossipCreateMenu(70014, player, 0) --Select a slot to place the card. You must select an empty slot.
+         pGo:GossipMenuAddItem(0, "Spell Row:", 1, 0)
+         for i=1, 5 do
+            local v = FIELDS[index][2][nConsole][2][i]
+            local proto = nil
+            local name = "Empty"
+            local iid = 81+i
+            local colour = ""
+            if (v) then
+               proto = v.m_proto
+               name = proto.Name
+               colour = GetTypeColour(proto.Type)
+               if (v.m_face == 1) then name = "(Face Down) - "..proto.Name; colour = ""; end
+               iid = 1
+            end
+            pGo:GossipMenuAddItem(7, colour.."["..name.."]", iid, 0)
+         end
+         pGo:GossipMenuAddItem(0, "Back", 1115, 0)
+         pGo:GossipSendMenu(player)
+      end
+   end
+   -------------------------------------------------------------------------------------------------
+   if (intid >= 82 and intid <= 86) then --select slot to play card.
+      local backs = CONSOLES[index][nConsole][7]
+      local backid = backs[#backs-2] --what did we press back in 'inspect hand from Main Phase 1'?
+      local dcid = backid-10000
+      if (DC_DB_CACHE[dcid].Type == CARD_TYPE.Monster) then
+         pGo:GossipCreateMenu(70015, player, 0) --Do you want to set this card face-down, or face-up?
+         pGo:GossipMenuAddItem(0, "Summon in attack mode", 89, 0)
+         pGo:GossipMenuAddItem(0, "Set in face-down defense position", 90, 0)
+         pGo:GossipMenuAddItem(0, "Back", 1115, 0) --1115 shall always be back.
+         pGo:GossipSendMenu(player)
+      elseif (DC_DB_CACHE[dcid].Type == CARD_TYPE.Spell and DC_DB_CACHE[dcid].S_Type ~= SPELL_TYPE["Quick-play"]) then
+         pGo:GossipCreateMenu(70015, player, 0) --Do you want to set this card face-down, or face-up?
+         pGo:GossipMenuAddItem(0, "Activate", 87, 0)
+         pGo:GossipMenuAddItem(0, "Set face-down", 88, 0)
+         pGo:GossipMenuAddItem(0, "Back", 1115, 0) --1115 shall always be back.
+         pGo:GossipSendMenu(player)
+      else
+         pGo:GossipCreateMenu(70016, player, 0) --You can only set this type of card face-down this turn.
+         pGo:GossipMenuAddItem(0, "Set face-down", 88, 0)
+         pGo:GossipMenuAddItem(0, "Back", 1115, 0) --1115 shall always be back.
+         pGo:GossipSendMenu(player)
+      end
+   end
+   -------------------------------------------------------------------------------------------------
+   if (intid == 87 or intid == 88) then --activate/set spell card from hand
+      local backs = CONSOLES[index][nConsole][7]
+      local backid = backs[#backs-3] --what did we press back in 'inspect hand from Main Phase 1'?
+      local dcid = backid-10000
+      local slot = backs[#backs-1]-81
+      --add equip spell stuff here
+      if (intid == 87) then
+         par.FIELD.ActivateSpellCard(index, nConsole, slot, dcid)
+         RemoveCardFromHand(index, nConsole, dcid)
+         return MainMenu(player)
+      else
+         par.FIELD.SetCard(index, nConsole, slot, dcid)
+         RemoveCardFromHand(index, nConsole, dcid)
+         return MainMenu(player)
+      end
+   end
+   -------------------------------------------------------------------------------------------------
+   if (intid == 89 or intid == 90) then --summon/set monster card
+      local backs = CONSOLES[index][nConsole][7]
+      local backid = backs[#backs-3] --what did we press back in 'inspect hand from Main Phase 1'?
+      local dcid = backid-10000
+      --normal or special summonable
+      if (HasFlag(dcid, MONSTER_FLAGS.SPECIAL_SUMMONABLE) and CONSOLES[index][nConsole][8]["NS"] ~= true and not HasFlag(intid-10000, MONSTER_FLAGS.NOT_NORMAL_SUMMONABLE)) then
+         --normal or special summonable
+         pGo:GossipCreateMenu(70018, player, 0) --This card is Special Summonable. Would you like to perform a Special Summon?
+         pGo:GossipMenuAddItem(7, DC_DB_CACHE[dcid].EffectText, 1, 0)
+         pGo:GossipMenuAddItem(0, "Yes, special summon", 91, 0)
+         pGo:GossipMenuAddItem(0, "No, normal summon", 106, 0)
+         pGo:GossipMenuAddItem(0, "Back", 1115, 0)
+         pGo:GossipSendMenu(player)
+      elseif (CONSOLES[index][nConsole][8]["NS"] ~= true and not HasFlag(intid-10000, MONSTER_FLAGS.NOT_NORMAL_SUMMONABLE)) then
+         --normal summonable only
+         OnConsoleInput(pGo, event, player, id, 106, "")
+      else
+         --special summonable only
+         OnConsoleInput(pGo, event, player, id, 91, "")
+      end
+   end
+   -------------------------------------------------------------------------------------------------
+   if (intid == 91) then --special summon
+      local backs = CONSOLES[index][nConsole][7]
+      local dcid = backs[#backs-4]-10000 --what did we press back in 'inspect hand from Main Phase 1'?
+      local slot = backs[#backs-2]-81
+      local mode = backs[#backs-1]-89
+      CALL_CARD_EVENT(EVENTS.PRE_SPECIAL_SUMMON, dcid, index, nConsole, slot, mode)
+      table.remove(backs) --we dont want to remember this selection
+   end
+   -------------------------------------------------------------------------------------------------
+   if (intid == 92) then --activate effect
+      local backs = CONSOLES[index][nConsole][7]
+      local slot = backs[#backs-1]-94
+      local obj = FIELDS[index][2][nConsole][1][slot]
+      CALL_CARD_EVENT(EVENTS.ON_EFFECT_ACTIVATED, obj.id, index, nConsole, obj)
+      obj.m_action = true
+   end
+   -------------------------------------------------------------------------------------------------
+   if (intid == 93) then --swap battle position
+      local backs = CONSOLES[index][nConsole][7]
+      local slot = backs[#backs-1]-94
+      local obj = FIELDS[index][2][nConsole][1][slot]
+      if (obj.m_mode == 0) then --if going atk -> def
+         if (not CALL_CARD_EVENT(EVENTS.ON_MODE_SWITCH, obj.id, index, nConsole, obj, 1)) then
+            return MainMenu(player)
+         end
+         SendMessageToDuel(index, player:GetName().." changed "..obj.m_proto.Name.." into defense mode!")
+         obj:SetMode(1)
+      elseif (obj.m_mode == 1) then --if going def -> atk
+         if (not CALL_CARD_EVENT(EVENTS.ON_MODE_SWITCH, obj.id, index, nConsole, obj, 0)) then
+            return MainMenu(player)
+         end
+         obj:SetMode(0)
+         if (obj:IsFaceDown()) then
+            if (not obj:FlipSummon()) then
+               return MainMenu(player)
+            end
+         end
+         SendMessageToDuel(index, player:GetName().." changed "..obj.m_proto.Name.." into attack mode!")
+      end
+      CONSOLES[obj.m_index][obj.m_side][8]["PC"] = true --"position change is done"
+      return MainMenu(player)
+   end
+   -------------------------------------------------------------------------------------------------
+   if (intid == 94) then --activate face-down spell from field
+      local backs = CONSOLES[index][nConsole][7]
+      local slot = backs[#backs-1]-99
+      local obj = FIELDS[index][2][nConsole][2][slot]
+      obj:Activate()
+      obj.m_action = true
+   end
+   -------------------------------------------------------------------------------------------------
+   if (intid >= 95 and intid <= 99) then --select slot to activate effect/change position (monster)
+      --also used by Battle Phase main menu for selecting a monster to attack with!
+      local slot = intid-94
+      local obj = FIELDS[index][2][nConsole][1][slot]
+      local addbuttons = {}
+      local nGPhase = DUELS[index][5]
+      if (IsMainPhase(nGPhase)) then
+         if (not obj.m_action and not obj.m_justPlayed and HasFlag(obj.id, MONSTER_FLAGS.ACTIVATABLE_EFFECT)) then
+            table.insert(addbuttons, "|cFF660000Activate Effect|r")
+            table.insert(addbuttons, 92)
+         end
+         if (not CONSOLES[index][nConsole][8]["PC"] and not obj.m_justPlayed) then
+            table.insert(addbuttons, "|cFF660000Swap battle position|r")
+            table.insert(addbuttons, 93)
+         end
+      elseif (obj:IsAttackMode() and obj:IsFaceUp() and not obj.hasAttacked) then
+         table.insert(addbuttons, "|cFF660000Attack with this monster|r")
+         table.insert(addbuttons, 111)
+      end
+      ShowCardInfo(obj, pGo, player, 1115, unpack(addbuttons))
+   end
+   -------------------------------------------------------------------------------------------------
+   if (intid >= 100 and intid <= 104) then --select slot to activate (spell/trap)
+      local slot = intid-99
+      local obj = FIELDS[index][2][nConsole][2][slot]
+      local addbuttons = {}
+      if (not obj.m_action and not (obj.m_speed == 2 and obj.m_justPlayed) and not HasFlag(obj.id, SPELL_FLAGS.NOT_ACTIVATABLE)) then
+         table.insert(addbuttons, "|cFF660000Activate Card|r")
+         table.insert(addbuttons, 94)
+      end
+      ShowCardInfo(obj.id, pGo, player, 1115, unpack(addbuttons))
+   end
+   -------------------------------------------------------------------------------------------------
+   if (intid == 105) then --next page of OfferChoice
+      local backs = CONSOLES[index][nConsole][7]
+      table.remove(backs) --we don't wanna store about how you're pressing 105...
+      ContinueChoice(pGo, player, id)
+   end
+   -------------------------------------------------------------------------------------------------
+   if (intid == 106) then --normal summon/set
+      local backs = CONSOLES[index][nConsole][7]
+      local dcid = backs[#backs-4]-10000 --what did we press back in 'inspect hand from Main Phase 1'?
+      local slot = backs[#backs-2]-81
+      local mode = backs[#backs-1]-89
+      if (DC_DB_CACHE[dcid].M_Level > 4 and code ~= "tribute passed") then --tribute summon procedures.
+         local number = 1
+         if (DC_DB_CACHE[dcid].M_Level > 6) then number = 2; end
+         local function tribute_pass(sender, player, choices)
+            for i,v in ipairs(choices) do
+               v:Discard()
+            end
+            OnConsoleInput(pGo, 2, player, 0, intid, "tribute passed")
+         end
+         table.remove(backs) --we dont want this intid here, we're not really doing 106, we're doing offer choice.
+         return OfferChoice(pGo, player, nConsole, "field", {m_proto = {Type = CARD_TYPE.Monster}}, number, tribute_pass)
+      end
+      if (not CALL_CARD_EVENT(EVENTS.PRE_SUMMON, dcid, index, nConsole, slot, mode)) then
+         return MainMenu(player)
+      else
+         par.SCRIPTMGR.DefaultHandleEvent(EVENTS.PRE_SUMMON)
+      end
+   end
+   -------------------------------------------------------------------------------------------------
+   if (intid == 107) then --"continue to Battle Phase"
+      NextPhase(index, nConsole)
+      SendMessageToDuel(index, string.format("%s continues to the Battle Phase.", player:GetName()))
+      return MainMenu(player)
+   end
+   -------------------------------------------------------------------------------------------------
+   if (intid == 110) then --Battle phase main menu
+      pGo:GossipCreateMenu(70020, player, 0) --Battle Phase: You can attack your opponent in this phase.
+      pGo:GossipMenuAddItem(7, "Inspect hand", 5000, 0)
+      pGo:GossipMenuAddItem(7, "Inspect field", 5001, 0)
+      pGo:GossipMenuAddItem(0, "Continue to Main Phase 2", 119, 0)
+      pGo:GossipSendMenu(player)
+   end
+   -------------------------------------------------------------------------------------------------
+   if (intid == 111) then --"Attack with a monster"
+      local nCon = GetOppCon(nConsole)
+      pGo:GossipCreateMenu(70017, player, 0) --Select a card:
+      if (#GetMonstersOnField(index, nCon, {}) > 0) then --there's a monster out there
+         pGo:GossipMenuAddItem(0, "Opponent's Monster Row:", 1, 0)
+         for i=1, 5 do
+            local v = FIELDS[index][2][nCon][1][i]
+            local proto = nil
+            local mode = ""
+            local name = "Empty"
+            local iid = 1
+            local colour = ""
+            if (v) then
+               proto = v.m_proto --duel creature always has proto
+               if (v.m_mode == 0) then mode = "(ATK)"; else mode = "(DEF)"; end
+               name = proto.Name
+               colour = GetTypeColour(proto.Type)
+               iid = 112+i --113 -> 117 select slot to attack
+               if (v.m_face == 1) then 
+                  name = "(Face Down)"
+                  colour = ""
+               end
+            end
+            pGo:GossipMenuAddItem(7, mode..colour.."["..name.."]", iid, 0)
+         end
+      else --no monsters: attack directly
+         pGo:GossipMenuAddItem(0, "Attack your opponent's lifepoints directly!", 112, 0)
+      end
+      pGo:GossipMenuAddItem(0, "Back", 1115, 0)
+      pGo:GossipSendMenu(player)
+   end
+   -------------------------------------------------------------------------------------------------
+   if (intid == 112) then --attack life points directly
+      local backs = CONSOLES[index][nConsole][7]
+      local slot = backs[#backs-2]-94
+      local obj = FIELDS[index][2][nConsole][1][slot]
+      obj:Attack(-1)
+      return MainMenu(player)
+   end
+   -------------------------------------------------------------------------------------------------
+   if (intid >= 113 and intid <= 117) then --select monster slot on opp's field to attack
+      local backs = CONSOLES[index][nConsole][7]
+      local slot_atk = backs[#backs-2]-94
+      local slot_vic = intid - 112
+      local aobj = FIELDS[index][2][nConsole][1][slot_atk]
+      local vobj = FIELDS[index][2][GetOppCon(nConsole)][1][slot_vic]
+      pGo:GossipCreateMenu(70021, player, 0) --Are you absolutely sure you want to attack?
+      pGo:GossipMenuAddItem(0, "Yes, attack!", 118, 0)
+      pGo:GossipMenuAddItem(0, "No", 1115, 0)
+      pGo:GossipMenuAddItem(7, "Check my monster's card information", 119+aobj.m_slot, 0)
+      if (vobj:IsFaceUp()) then
+         pGo:GossipMenuAddItem(7, "Check my target's card information", 124+vobj.m_slot, 0)
+      end
+      pGo:GossipSendMenu(player)
+   end
+   -------------------------------------------------------------------------------------------------
+   if (intid == 118) then --yes, definitely attack.
+      local backs = CONSOLES[index][nConsole][7]
+      local slot_atk = backs[#backs-3]-94
+      local slot_vic = backs[#backs-1]-112
+      local aobj = FIELDS[index][2][nConsole][1][slot_atk]
+      local vobj = FIELDS[index][2][GetOppCon(nConsole)][1][slot_vic]
+      aobj:Attack(vobj)
+      return MainMenu(player)
+   end
+   -------------------------------------------------------------------------------------------------
+   if (intid == 119) then --continue to main phase 2
+      NextPhase(index, nConsole)
+      SendMessageToDuel(index, string.format("%s ends the battle phase.", player:GetName()))
+      return MainMenu(player)
+   end
+   -------------------------------------------------------------------------------------------------
+   if (intid >= 120 and intid <= 129) then --inspect monster on field... 120-124 = my side, 125-129 = their side
+      local nCon = nConsole
+      if (intid >= 125) then nCon = GetOppCon(nConsole); end
+      local slot = intid-119
+      if (slot > 5) then slot = intid-124; end
+      local obj = FIELDS[index][2][nCon][1][slot]
+      return ShowCardInfo(obj, pGo, player, 1115)
+   end
+   -------------------------------------------------------------------------------------------------
+   if (intid == 5000 or intid == 5004) then --inspect hand
+      pGo:GossipCreateMenu(70012, player, 0) --Your current hand. Select a card to view details.
+      for i,v in ipairs(CONSOLES[index][nConsole][5]) do
+         local proto = DC_DB_CACHE[v]
+         local colourtext = GetTypeColour(proto.Type)
+         --if the intid is 5004 we'll handle "play card" down in the 10000+v int id.
+         pGo:GossipMenuAddItem(7, colourtext.."["..proto.Name.."]", 10000+v, 0) --inspect card: 10000+dcid
+      end
+      pGo:GossipMenuAddItem(0, "Back", 1115, 0) --1115 shall always be back.
+      pGo:GossipSendMenu(player)
+   end
+   -------------------------------------------------------------------------------------------------
+   if (intid == 5001 or intid == 5005) then --inspect field
+      pGo:GossipCreateMenu(70010, player, 0)
+      local proto = DC_DB_CACHE[FIELDS[index][1]] --field spell proto
+      if (proto == nil) then
+         pGo:GossipMenuAddItem(7, "Field spell card: (None)", 1, 0)
+      else
+         local colour = GetTypeColour(proto.Type)
+         pGo:GossipMenuAddItem(7, "Field spell card: "..colour.."["..proto.Name.."]", 10000+FIELDS[index][3], 0)
+      end
+      pGo:GossipMenuAddItem(7, "View your side of the field", 5002, 0)
+      pGo:GossipMenuAddItem(7, "View your opponent's side of the field", 5003, 0)
+      pGo:GossipMenuAddItem(0, "Back", 1115, 0) --1115 shall always be back.
+      pGo:GossipSendMenu(player)
+   end
+   -------------------------------------------------------------------------------------------------
+   if (intid == 5002 or intid == 5003) then --viewing your/opp's side of the field
+      local nCon = nConsole
+      if (intid == 5003) then nCon = GetOppCon(nConsole); end
+      pGo:GossipCreateMenu(70010, player, 0)
+      pGo:GossipMenuAddItem(7, "View Graveyard", 5005+nCon, 0)
+      pGo:GossipMenuAddItem(0, "Monster Row:", 1, 0)
+      for i=1, 5 do
+         local v = FIELDS[index][2][nCon][1][i]
+         local proto = nil
+         local mode = ""
+         local name = "Empty"
+         local iid = 1
+         local colour = ""
+         if (v) then
+            proto = v.m_proto --duel creature always has proto
+            if (v.m_mode == 0) then mode = "(ATK)"; else mode = "(DEF)"; end
+            name = proto.Name
+            colour = GetTypeColour(proto.Type)
+            local oppmod = 0; if (nCon ~= nConsole) then oppmod = 5; end
+            iid = 119+i+oppmod
+            if (nCon == nConsole) then
+               iid = 94+i
+            end
+            if (v.m_face == 1 and nCon ~= nConsole) then 
+               name = "(Face Down)"
+               colour = ""
+               iid = 1
+            elseif (v.m_face == 1) then
+               name = "(Face Down) - "..proto.Name
+            end
+         end
+         pGo:GossipMenuAddItem(7, mode..colour.."["..name.."]", iid, 0)
+      end
+      pGo:GossipMenuAddItem(0, "Spell Row:", 1, 0)
+      for i=1, 5 do
+         local v = FIELDS[index][2][nCon][2][i]
+         local proto = nil
+         local name = "Empty"
+         local iid = 1
+         local colour = ""
+         if (v) then
+            proto = v.m_proto
+            name = proto.Name
+            colour = GetTypeColour(proto.Type)
+            iid = 10000+v.id
+            if (nCon == nConsole and v.m_face == 1) then
+               iid = 99+i
+            end
+            if (v.m_face == 1 and nCon ~= nConsole) then 
+               name = "(Face Down)"
+               colour = ""
+               iid = 1
+            elseif (v.m_face == 1) then
+               name = "(Face Down) - "..proto.Name
+            end
+         end
+         pGo:GossipMenuAddItem(7, colour.."["..name.."]", iid, 0)
+      end
+      pGo:GossipMenuAddItem(0, "Back", 1115, 0)
+      pGo:GossipSendMenu(player)
+   end
+   -------------------------------------------------------------------------------------------------
+   if (intid == 5006 or intid == 5007) then --view you/your opponent's graveyard
+      local nCon = intid-5005
+      pGo:GossipCreateMenu(70010, player, 0)
+      local gy = CONSOLES[index][nCon][6]
+      for i=1,10 do
+         if (gy[i]) then
+            local proto = DC_DB_CACHE[gy[i]]
+            pGo:GossipMenuAddItem(7, GetTypeColour(proto.Type).."["..proto.Name.."]", 10000+gy[i], 0)
+         end
+      end
+      if (#gy > 10) then
+         pGo:GossipMenuAddItem(0, "Next Page", 5008, 0)
+      end
+      pGo:GossipMenuAddItem(0, "Back", 1115, 0)
+      pGo:GossipSendMenu(player)
+   end
+   -------------------------------------------------------------------------------------------------
+   if (intid == 5008) then --next page graveyard
+      pGo:GossipCreateMenu(70010, player, 0)
+      local backs = CONSOLES[index][nConsole][7]
+      local pagecount = 0
+      for i=#backs, 1, -1 do
+         if (backs[i] == 5008) then
+            pagecount = pagecount + 1
+         end
+      end
+      local nCon = backs[#backs-pagecount]-5005
+      local gy = CONSOLES[index][nCon][6]
+      for i=10*pagecount+1, 10*pagecount+10 do
+         if (gy[i]) then
+            local proto = DC_DB_CACHE[gy[i]]
+            pGo:GossipMenuAddItem(7, GetTypeColour(proto.Type).."["..proto.Name.."]", 10000+gy[i], 0)
+         end
+      end
+      if (#gy-10*pagecount > 10) then
+         pGo:GossipMenuAddItem(0, "Next Page", 5008, 0)
+      end
+      pGo:GossipMenuAddItem(0, "Previous Page", 1115, 0) --oh man, love this back storage system. it's just so handy.
+      pGo:GossipSendMenu(player)
+   end
+   -------------------------------------------------------------------------------------------------
+   if (intid == 5010) then --end turn.
+      local hand = CONSOLES[index][nConsole][5]
+      local function discard_choices(sender, player, choices)
+         for i,v in ipairs(choices) do
+            RemoveCardFromHand(index, nConsole, v)
+            table.insert(CONSOLES[index][nConsole][6], v)
+         end
+         local plural = "s"; if (#choices == 1) then plural = ""; end
+         SendMessageToDuel(index, string.format("%s sent %d card%s to the graveyard because they had more than six cards in their hand.", player:GetName(), plural, #choices))
+         OnConsoleInput(pGo, 2, player, 0, 5010, "")
+      end
+      if (#hand > 6) then
+         OfferChoice(pGo, player, nConsole, "hand", {}, #hand-6, discard_choices, 70019)
+         return
+      end
+      DUELS[index][5] = 0 --game phase 0
+      CONSOLES[index][nConsole][7] = {} --clear backs
+      par.FIELD.ClearTurnStuff(index, nConsole) --clear per-monster turn vars
+      DUELS[index][6] = false --not first turn
+      CONSOLES[index][nConsole][8] = {} --clear turn vars
+      CONSOLES[index][nConsole][4] = false --not my turn anymore
+      CONSOLES[index][GetOppCon(nConsole)][4] = true --it's your move!
+      CALL_CARD_EVENT(EVENTS.ON_END_PHASE, -1, index, nConsole)
+      SendMessageToDuel(index, string.format("%s ends their turn.", player:GetName()))
+      MainMenu(GetPlayer(DUELS[index][GetOppCon(nConsole)]))
+      return MainMenu(player)
+   end
+   -------------------------------------------------------------------------------------------------
+   if (intid > 10000) then --view card
+      local backs = CONSOLES[index][nConsole][7]
+      local backid = backs[#backs-1] --this will be the last used menu
+      local addbuttons = {}
+      if (backid == 5004) then --we came from 'inspect hand from Main Phase 1'
+         if (CONSOLES[index][nConsole][8]["NS"] ~= true and not HasFlag(intid-10000, MONSTER_FLAGS.NOT_NORMAL_SUMMONABLE)) then --normal summonable
+            if (DC_DB_CACHE[intid-10000].M_Level > 4) then
+               if (HasFlag(intid-10000, MONSTER_FLAGS.SPECIAL_SUMMONABLE)) then
+                  table.insert(addbuttons, "|cFF660000Play Card! (Tribute/Special Summon)|r")
+               else
+                  table.insert(addbuttons, "|cFF660000Play Card! (Tribute Summon)|r")
+               end
+            else
+               if (HasFlag(intid-10000, MONSTER_FLAGS.SPECIAL_SUMMONABLE)) then
+                  table.insert(addbuttons, "|cFF660000Play Card! (Normal/Special Summon)|r")
+               else
+                  table.insert(addbuttons, "|cFF660000Play Card! (Normal Summon)|r")
+               end
+            end
+            table.insert(addbuttons, 81)
+         elseif (HasFlag(intid-10000, MONSTER_FLAGS.SPECIAL_SUMMONABLE)) then
+            table.insert(addbuttons, "|cFF660000Play Card! (Special Summon)|r")
+         end
+      end
+      ShowCardInfo(intid-10000, pGo, player, 1115, unpack(addbuttons))
+   end
+   -------------------------------------------------------------------------------------------------
+   if (intid == 20) then --not your turn options
+      pGo:GossipCreateMenu(70010, player, 0)
+      pGo:GossipMenuAddItem(7, "Inspect hand", 5000, 0)
+      pGo:GossipMenuAddItem(7, "Inspect field", 5001, 0)
+      pGo:GossipSendMenu(player)
+   end
+   -------------------------------------------------------------------------------------------------
+end
+
+RegisterGameObjectEvent(nConsole, 4, OnActivate)
+RegisterGOGossipEvent(nConsole, 2, OnConsoleInput)
+
+function HandleDCChats2(event, player, message, ctype, lang, misc)
+   message = message:lower()
+   if (message == "#leave" or message == "#sur" or message == "#surrender") then
+      local index = GetDuelIndex(player:GetName())
+      if (index ~= nil) then
+         SendMessageToDuel(index, player:GetName().." surrendered!")
+         EndDuel(index, player:GetName(), false)
+         return false
+      end
+   end
+end
+
+function HandleDCLogout2(e, player)
+   local index = GetDuelIndex(player:GetName())
+   if (index ~= nil) then
+      EndDuel(index, player:GetName(), false)
+   end
+end
+
+RegisterServerHook(16, HandleDCChats2)
+RegisterServerHook(13, HandleDCLogout2)

@@ -1,0 +1,48 @@
+-----------------------
+--Made by Hypersniper--
+-------wow-v.com-------
+--For Burning Heavens--
+-----------------------
+
+MAGALOS = {}
+
+function MAGALOS.OnCombat(pUnit, event, pAttacker)
+   pUnit:RegisterEvent("MAGALOS.Phase1", 1000, 0)
+   pUnit:RegisterEvent("MAGALOS.StaticConduit", 10000, 0)
+   pUnit:RegisterEvent("MAGALOS.BallLightning", 16000, 0)
+end
+
+function MAGALOS.reRegister(pUnit)
+   pUnit:RegisterEvent("MAGALOS.StaticConduit", 10000, 0)
+   pUnit:RegisterEvent("MAGALOS.BallLightning", 16000, 0)
+end
+
+function MAGALOS.Phase1(pUnit)
+   if (pUnit:GetHealthPct() <= 40) then
+      pUnit:RemoveEvents()
+      pUnit:ChannelSpell(59848, pUnit) --lightning ring
+      pUnit:RegisterEvent("MAGALOS.reRegister", 10000, 1)
+   end
+end
+
+function MAGALOS.StaticConduit(pUnit)
+   pUnit:CastSpell(20542) --static conduit
+end
+
+function MAGALOS.BallLightning(pUnit)
+   local r = pUnit:GetRandomPlayer(0)
+   if (r == nil) then
+      pUnit:RegisterEvent("MAGALOS.BallLightning", 500, 1)
+   else
+      --not sure if this is correct way to cast the spell
+      pUnit:CastSpellAoF(r:GetX(), r:GetY(), r:GetZ(), 56319) --ball lightning
+   end
+end
+
+function MAGALOS.removeEvents(pUnit)
+   pUnit:RemoveEvents()
+end
+
+RegisterUnitEvent(80000011, 1, "MAGALOS.OnCombat")
+RegisterUnitEvent(80000011, 2, "MAGALOS.removeEvents")
+RegisterUnitEvent(80000011, 4, "MAGALOS.removeEvents")

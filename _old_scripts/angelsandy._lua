@@ -1,0 +1,98 @@
+--[[ Server Event(s) - Server Hook Events.lua
+********************************
+*                              *
+*     Team Phoenix Release     *
+*                              *
+********************************
+
+This software is provided as free and open source by the
+staff of The Phoenix Team, in accordance with
+the AGPL license. This means we provide the software we have
+created freely and it has been thoroughly tested to work for
+the developers, but NO GUARANTEE is made it will work for you
+as well. Please give credit where credit is due, if modifying,
+redistributing and/or using this software. Thank you.
+
+~~End of License Agreement
+-- Team Phoenix, MONTH DATE, 2009. ]]
+ 
+--[[On/Off Switches]]--
+local NewPlayerSwitch = 1            	-- Please set 1 if you wanna use this function and 0 if you don't want to.
+local NewGuildSwitch = 1              	-- Please set 1 if you wanna use this function and 0 if you don't want to.
+local GrantPvPRewardSwitch = 1        	-- Please set 1 if you wanna use this function and 0 if you don't want to.
+ 
+--[[GrantPvPReward Locals]]--
+local PvPToken = 45624 					-- Insert The PvP Tokens Entry here!
+local TokenAmount = 1 					-- This should be self-explanary :b
+ 
+--[[NewPlayer Locals]]--
+local MiscCheck = 1 					-- If you are gonna give your new players some kind of item when they first log on, please set this to true! (1)
+local MiscItem = 44819 					-- If you put "True" in the above local, please put the Entry ID of the Item the player should be granted here.
+local MiscAmount = 1					-- Put the amount of the speficied item the player should get upon first login here.
+ 
+-------------------------------------------------------------------------------------------------------------------------------
+-------------------------------------------------------------------------------------------------------------------------------
+-- DO NOT EDIT BEYOND THIS POINT UNLESS YOU KNOW WHAT YOU ARE DOING. WE TAKE NO RESPONSEABILITY SHOULD YOU BREAK THE SCRIPT --
+-------------------------------------------------------------------------------------------------------------------------------
+-------------------------------------------------------------------------------------------------------------------------------
+
+function NewPlayer(event, pPlayer)
+	print("NEW PLAYER")
+        if (NewPlayerSwitch == 0) then
+		print("LuaEngine: The function 'NewPlayer' was disabled") -- Sad face :(		
+	elseif (NewPlayerSwitch == 1) then
+		local PlayerName = pPlayer:GetName()
+		if (MiscCheck == 1) then
+			pPlayer:DealGoldMerit(10000000) -- 10000000 copper = 1000 gold
+			pPlayer:SendAreaTriggerMessage("Welcome"..PlayerName.."! Please enjoy your stay here on the server!")
+			pPlayer:SendAreaTriggerMessage("As a little 'Welcome Gift' the server has granted you a pet and 1000 gold! Enjoy!")
+			pPlayer:AddItem(MiscItem, MiscAmount)
+		elseif (MiscCheck == 0) then
+                        pPlayer:DealGoldMerit(10000000) -- 10000000 copper = 1000 gold
+                        pPlayer:SendAreaTriggerMessage("Welcome"..PlayerName.."! Please enjoy your stay here on the server!")
+        	end
+	end
+end
+ 
+function NewGuild(event, pLeader, guildName)
+	print("ON GUILD CREATE")
+        if (NewGuildSwitch == 0) then
+		print("LuaEngine: The function 'NewGuild' was disabled") -- Sad face :(
+        elseif (NewGuildSwitch == 1) then
+		local LeaderName = pLeader:GetName()
+ 		local Race = pLeader:GetTeam() --FIXED: You want GetTeam() not GetFaction() :)
+		local Horde = "|cffff0000HORDE|r" -- Makes the word "HORDE" Red
+ 		local Alliance = "|cff0000ffALLIANCE|r" -- Makes the word "ALLIANCE" Blue
+		if (Race == 1) then
+                        SendWorldMessage("The "..Horde.." player "..LeaderName.." has just made the guild "..guildName.."! Congratulations!",1)
+                        pLeader:SendAreaTriggerMessage("Congratulations on your newly started guild "..LeaderName.."!")
+                elseif (Race == 0) then
+			SendWorldMessage("The "..Alliance.." player "..LeaderName.." has just made the guild "..guildName.."! Congratulations!",1)
+			pLeader:SendAreaTriggerMessage("Congratulations on your newly started guild "..LeaderName.."!")
+                end
+        end
+end
+ 
+function GrantPvPReward(event, pPlayer, pKilled)
+        if (GrantPvPRewardSwitch == 0) then
+		print("LuaEngine: The function 'GrantPvPReward' was disabled") -- Sad face :(
+        elseif (GrantPvPRewardSwitch == 1) then
+                local KillerName = pPlayer:GetName()
+               	local VictimName = pKilled:GetName()
+                pPlayer:GiveHonor(200)
+                pPlayer:DealGoldMerit(200000) -- 200000 copper = 20 gold
+                pPlayer:AddItem(PvPToken, TokenAmount)
+                pPlayer:SendAreaTriggerMessage("You earned 1 token, "..Money.." gold, and 200 Honor Points by killing "..VictimName)
+                pKilled:SendAreaTriggerMessage(KillerName.." got the killing blow on you.")
+        end
+end
+ 
+--[[Lua Engine Check!]]--
+if (GetLuaEngine() ~= "LuaHypArc") then
+	print("LuaEngine: Did not load 'Server Hook Events' script - LuaHypArc not Installed.")
+	print("LuaEngine: Please visit http://luahyparc.zapto.org/ for more information.")
+else
+	RegisterServerHook(20, "NewPlayer")
+	RegisterServerHook(18, "NewGuild")
+	RegisterServerHook(23, "GrantPvPReward")
+end

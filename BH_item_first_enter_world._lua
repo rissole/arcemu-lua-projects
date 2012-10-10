@@ -1,0 +1,13 @@
+-----------------------
+--Made by Hypersniper--
+-------wow-v.com-------
+--For Burning Heavens--
+-----------------------
+
+local itemid = 1337
+
+function BH_ItemOnFirstEnterWorld(event, player)
+   player:AddItem(itemid,1)
+end
+
+RegisterServerHook(3, "BH_ItemOnFirstEnterWorld")

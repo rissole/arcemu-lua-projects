@@ -1,0 +1,89 @@
+<Ui xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns="http://www.blizzard.com/wow/ui/">
+	<Script file="lua.lua" />
+	<Frame name="NETGRAPH3" parent="UIParent" toplevel="true" movable="true" enableMouse="true">
+		<Size>
+			<AbsDimension x="220" y="100" />
+		</Size>
+		<Anchors>
+			<Anchor point="TOPLEFT">
+				<Offset>
+					<AbsDimension x="117" y="-47" />
+				</Offset>
+			</Anchor>
+		</Anchors>
+		<Scripts>
+			<OnMouseDown>self:StartMoving();</OnMouseDown>
+			<OnMouseUp>self:StopMovingOrSizing();</OnMouseUp>
+			<OnLoad>NETGRAPH3_update_data()</OnLoad>
+			<OnUpdate>NETGRAPH3_OnUpdate(self, elapsed);</OnUpdate>
+		</Scripts>
+		<Layers>
+			<Layer> 
+				<FontString name="S_FPS" inherits="GameFontNormalSmall" justifyH="LEFT">
+					<Color r="1.0" g="1.0" b="1.0"/>
+					<Size x="180" y="25" />
+					<Anchors>
+						<Anchor point="TOPLEFT">
+							<Offset x="-25" y="-20" />
+						</Anchor>
+					</Anchors>
+				</FontString>
+				<FontString name="S_DOWNKBPS" inherits="GameFontNormalSmall" justifyH="LEFT">
+					<Color r="1.0" g="1.0" b="1.0"/>
+					<Size x="180" y="25" />
+					<Anchors>
+						<Anchor point="TOPLEFT">
+							<Offset x="-25" y="-40" />
+						</Anchor>
+					</Anchors>
+				</FontString>
+				<FontString name="S_UPKBPS" inherits="GameFontNormalSmall" justifyH="LEFT">
+					<Color r="1.0" g="1.0" b="1.0"/>
+					<Size x="180" y="25" />
+					<Anchors>
+						<Anchor point="TOPLEFT">
+							<Offset x="-25" y="-60" />
+						</Anchor>
+					</Anchors>
+				</FontString>
+				<FontString name="S_TDOWNKB" inherits="GameFontNormalSmall" justifyH="LEFT">
+					<Color r="1.0" g="1.0" b="1.0"/>
+					<Size x="180" y="25" />
+					<Anchors>
+						<Anchor point="TOPLEFT">
+							<Offset x="80" y="-20" />
+						</Anchor>
+					</Anchors>
+				</FontString>
+				<FontString name="S_TUPKB" inherits="GameFontNormalSmall" justifyH="LEFT">
+					<Color r="1.0" g="1.0" b="1.0"/>
+					<Size x="180" y="25" />
+					<Anchors>
+						<Anchor point="TOPLEFT">
+							<Offset x="80" y="-40" />
+						</Anchor>
+					</Anchors>
+				</FontString>
+				<FontString name="S_TKB" inherits="GameFontNormalSmall" justifyH="LEFT">
+					<Color r="1.0" g="1.0" b="1.0"/>
+					<Size x="180" y="25" />
+					<Anchors>
+						<Anchor point="TOPLEFT">
+							<Offset x="80" y="-60" />
+						</Anchor>
+					</Anchors>
+				</FontString>
+				<FontString name="S_LAG" inherits="GameFontNormalSmall" justifyH="LEFT">
+					<Color r="1.0" g="1.0" b="1.0"/>
+					<Size x="180" y="25" />
+					<Anchors>
+						<Anchor point="TOPLEFT">
+							<Offset x="-25" y="-80" />
+						</Anchor>
+					</Anchors>
+				</FontString>
+			</Layer>
+		</Layers>
+
+	</Frame>
+</Ui>

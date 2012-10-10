@@ -1,0 +1,364 @@
+DC_Card = {}
+DC_Card.__index = DC_Card
+
+DC_Creature = {}
+DC_Creature.__index = DC_Card
+setmetatable(DC_Creature, DC_Creature) --allows for inheritance
+local creature_inherit = {__index = DC_Creature}
+
+DC_Magic = {} --magic = spell+trap
+DC_Magic.__index = DC_Card
+setmetatable(DC_Magic, DC_Magic) --allows for inheritance
+local magic_inherit = {__index = DC_Magic}
+
+--face: 0 = up
+--mode: 0 = atk
+
+--[[
+     Returns a new, default DuelCreature card from the specified DCID bound to a unit.
+     This is a parent object, spells/creatures inherit from this.
+--]]
+function DC_Card:Create(dcid)
+   local proto = DC_DB_CACHE[dcid] --proto contains static, default members.
+   if (not proto) then print("Error, tried to create Duel Creature with invalid DCID "..dcid); return; end
+   --the actual object has dynamic members.
+   local new = {id = dcid, m_proto = proto, m_face = 0, m_index = nil, m_side = nil, m_slot = nil, m_action = false, m_extras = {}, m_justPlayed = true}
+   --id, m_proto obvious
+   --m_face: 0 = face-up, 1 = face-down
+   --m_index = duel index, m_side = which console owns it, m_slot obvious
+   --m_action = whether this card has been activated (effect) this turn
+   --m_extras = custom vars. Will be wiped at the end of each turn, unless flagged as persistent by prefixing a key with "P_"
+     -- eg m_extras["P_time_summoned"] will not be nil'd at the end of a turn, however m_extras["time_summoned"] will be.
+   setmetatable(new, DC_Card)
+   return new
+end
+
+--[[
+     Deletes card and adds to the graveyard. Also hook happens here.
+--]]
+function DC_Card:Discard()
+   assert(self.m_index and self.m_side and self.m_slot, "Discard error")
+   if (not CALL_CARD_EVENT(EVENTS.ON_DISCARD, self.id, self.m_index, self.m_side, function() self:Discard() end, self)) then
+      return false
+   end
+   self:Delete()
+   table.insert(CONSOLES[self.m_index][self.m_side][6], self.id)
+   return true
+end
+
+--[[
+     This despawns the card object and clears that slot on the field.
+--]]
+function DC_Card:Delete()
+   assert(self.m_index and self.m_side and self.m_slot, "Discard error")
+   if (self.m_proto.Type == CARD_TYPE.Monster) then
+      assert(self._unit, "Discard error: Invalid unit")
+      self._unit:Despawn(0,0)
+      self._unit = nil
+      FIELDS[self.m_index][2][self.m_side][1][self.m_slot] = nil
+   else
+      assert(self._go, "Discard error: Invalid GO")
+      self._go:Despawn(0,0)
+      self._go = nil
+      FIELDS[self.m_index][2][self.m_side][2][self.m_slot] = nil
+   end
+end
+
+--[[
+     Returns a new, default DuelCreature monster from the specified DCID bound to a unit.
+--]]
+function DC_Creature:Create(dcid, pUnit)
+   local proto = DC_DB_CACHE[dcid] --proto contains static, default members.
+   if (not proto) then print("Error, tried to create Duel Creature with invalid DCID "..dcid); return; end
+   if (not pUnit or not pUnit:IsInWorld() or pUnit:IsDead()) then 
+      print("Error, tried to create Duel Creature with invalid unit (DCID "..dcid..")")
+      return
+   end
+   local new = DC_Card:Create(dcid)
+   --the actual object has dynamic members. attack may be changed by field/equip cards etc.
+   new.m_atk = proto.M_Attack
+   new.m_def = proto.M_Defense
+   --m_atk/m_def obvious
+   new.m_mode = 0
+   new.wasSpecialSummoned = false
+   new.hasAttacked = false
+   new._unit = pUnit
+   pUnit:ModifyWalkSpeed(10)
+   pUnit:SetUInt32Value(UNIT_FIELD_FLAGS, UNIT_FLAG_NOT_ATTACKABLE_2)
+   setmetatable(new, creature_inherit)
+   return new
+end
+
+--[[
+     Sets internal attack, and updates the atk bar.
+--]]
+function DC_Creature:SetAttack(value)
+   self._unit:SetMaxHealth(value)
+   self._unit:SetHealth(value)
+   self.m_atk = value
+end
+
+--[[
+     Sets internal defense, and updates the def bar.
+--]]
+function DC_Creature:SetDefense(value)
+   self._unit:SetMaxMana(value)
+   self._unit:SetMana(value)
+   self.m_def = value
+end
+
+--[[
+     Sets the monster into face-up/face-down.
+     0=face-up, 1=face-down.
+--]]
+function DC_Creature:SetFace(face)
+   assert(face == 0 or face == 1, "SetFace error: argument one must be 0 or 1")
+   if (self.m_face == face) then return; end
+   local player = GetPlayer(DUELS[self.m_index][self.m_side])
+   assert(player and player:IsInWorld() and player:IsAlive(), "SetFace error ("..self.id..")")
+   local x,y,z,o = par.FIELD.GetSlotPosition(self.m_proto.Type, self.m_side, self.m_slot)
+   local phase = self._unit:GetPhase()
+   if (face == 0) then --go face-up!
+      self._unit:Despawn(1, 0)
+      if (self.m_mode == 1) then o = o + math.pi; end --defense mode... face away
+      self._unit = player:SpawnCreature(par.FIELD.nDuelCreature, x, y, z, o, 7, 0, 0, 0, 0, phase)
+      self._unit:SetModel(self.m_proto.M_Display)
+      self._unit:SetScale(3)
+      self:SetAttack(self.m_atk)
+      self:SetDefense(self.m_def)
+      SendMessageToDuel(self.m_index, self.m_proto.Name.." is flipped face-up!")
+   elseif (face == 1) then --go face-down!
+      self._unit:Despawn(1, 0)
+      if (self.m_mode == 1) then o = o + math.pi/2; end --defense mode - on its side
+      self._unit = player:SpawnCreature(par.FIELD.nFaceDownCardNPC, x, y, z, o, 7, 0, 0, 0, 0, phase)
+      self._unit:SetScale(3)
+      SendMessageToDuel(self.m_index, self.m_proto.Name.. " is flipped face-down!")
+   end
+   self.m_face = face
+end
+
+--[[
+     Sets the monster into attack/defense mode.
+     attack = 0, defense = 1.
+--]]
+function DC_Creature:SetMode(mode)
+   assert(mode == 0 or mode == 1, "SetMode error: argument one must be 0 or 1")
+   if (self.m_mode == mode) then return; end
+   if (mode == 0) then
+      local ochange = math.pi
+      if (self.m_face == 1) then
+         ochange = math.pi/2
+      end
+      self._unit:SetFacing(self._unit:GetO()-ochange)
+   elseif (mode == 1) then
+      local ochange = math.pi
+      if (self.m_face == 1) then
+         ochange = math.pi/2
+      end
+      self._unit:SetFacing(self._unit:GetO()+ochange)
+   end
+   self.m_mode = mode
+end
+
+function DC_Creature:GetUnit()
+   return self._unit
+end
+
+function DC_Creature:IsAttackMode()
+   return (self.m_mode == 0)
+end
+
+function DC_Creature:IsDefenseMode()
+   return (self.m_mode == 1)
+end
+
+function DC_Card:IsFaceUp()
+   return (self.m_face == 0)
+end
+
+function DC_Card:IsFaceDown()
+   return (self.m_face == 1)
+end
+
+function DC_Creature:FlipSummon(forceAttackMode) --flip summon: face down => face up; returns false on failure
+   if (self:IsFaceDown()) then
+      if (not CALL_CARD_EVENT(EVENTS.ON_FLIP_SUMMON, self.id, self.m_index, self.m_side, function() self:FlipSummon(forceAttackMode) end, self, forceAttackMode)) then
+         return false
+      end
+      if (forceAttackMode) then self:SetMode(0); end
+      self:SetFace(0)
+      return true
+   end
+   return false
+end
+
+--Handles animations. (Running and attacking or casting KillSpell)
+--dcc is the card object target, or -1 if you want to attack lifepoints directly.
+--impactFunc is the function that should occur when the creature visually "hits" the target. Used to tell when to Discard the monster(s).
+function DC_Creature:DoAttackAnims(dcc, impactFunc)
+   assert(dcc == -1 or (type(dcc) == "table" and dcc.m_proto and dcc.m_proto.Type == CARD_TYPE.Monster), "DoAttackAnims error: argument 1 expecting Duel Creature Monster or -1")
+   assert(type(impactFunc) == "function", "DoAttackAnims error: no OnImpact function specified.")
+   self:GetUnit():SetUInt32Value(UNIT_NPC_EMOTESTATE, 30) --cancel any current emotes.
+   if (self.m_proto.M_KillSpell == 0) then --default melee behaviour
+      local function DistToPoint(x,y,z,o,x2,y2,z2,o2)
+         local posTar = {x, y, z}
+         local posNow = {x2, y2, z2}
+         local distance = 0
+         for i,v in ipairs(posNow) do
+            distance = distance + (v-posTar[i])^2
+         end
+         return math.sqrt(distance) --yards
+      end
+      local function TimeToPoint(x,y,z,o,x2,y2,z2,o2,speed)
+         local dist = PathLib._DistToPoint(x,y,z,o,x2,y2,z2,o2)
+         return math.floor((dist / speed) * 1000)
+      end
+      
+      local x,y,z,o = self:GetUnit():GetLocation()
+      local tar = CONSOLES[self.m_index][GetOppCon(self.m_side)][1]
+      local dist, angleoffset = 10, math.pi
+      if (dcc ~= -1) then
+         tar = dcc:GetUnit()
+         dist, angleoffset = 5, 0
+      end
+      local dx = tar:GetX() + dist * math.cos(tar:GetO()+angleoffset)
+      local dy = tar:GetY() + dist * math.sin(tar:GetO()+angleoffset)
+      self:GetUnit():MoveTo(dx, dy, z, o)
+      local function doAttack()
+         self:GetUnit():SetFacing(tar:GetO()+angleoffset+math.pi)
+         self:GetUnit():CreateLuaEvent(function() self:GetUnit():CastSpellOnTarget(par.FIELD.nMeleeKillSpell, tar); DefaultImpact(self,dcc); end, 600, 1)
+         self:GetUnit():CreateLuaEvent(function() self:GetUnit():MoveTo(x,y,z,o) end, 1700, 1)
+         self:GetUnit():CreateLuaEvent(function() RestrictConsoleAccess(self.m_index, self.m_side, false) end, TimeToPoint(dx,dy,z,o,x,y,z,o,10)+500, 1)
+      end
+      self:GetUnit():CreateLuaEvent(doAttack, TimeToPoint(x,y,z,o,dx,dy,z,o,10)+500, 1)
+   else
+      if (dcc ~= -1) then
+         self:GetUnit():CastSpellOnTarget(self.m_proto.M_KillSpell, dcc:GetUnit())
+         dcc:GetUnit():SetHealth(dcc:GetUnit():GetMaxHealth())
+         dcc:GetUnit():RemoveNegativeAuras()
+         DefaultImpact(self,dcc) --hmm... can't accommodate for spell fly time, but too bad.
+         RestrictConsoleAccess(self.m_index, self.m_side, false)
+      else
+         local x,y,z = CONSOLES[self.m_index][GetOppCon(self.m_side)][1]:GetLocation()
+         local tar = self:GetUnit():GetCreatureNearestCoords(x, y, z, par.FIELD.nKillSpellTarget)
+         if (not tar) then print("DoAttackAnims error: No KillSpell target for direct attacks, aborting animation."); return; end
+         self:GetUnit():CastSpellOnTarget(self.m_proto.M_KillSpell, tar)
+         tar:SetHealth(tar:GetMaxHealth())
+         tar:RemoveNegativeAuras()
+         DefaultImpact(self,dcc)
+         RestrictConsoleAccess(self.m_index, self.m_side, false)
+      end
+   end
+end
+
+--Default, regular duel behaviour. This can safely be re-used in scripts.
+function DefaultImpact(self, dcc)
+   if (dcc ~= -1) then
+      if (dcc:IsAttackMode()) then
+         if (self.m_atk > dcc.m_atk) then
+            dcc:Discard()
+            SendMessageToDuel(self.m_index, string.format("%s destroys %s, dealing %d damage to %s's lifepoints!", self.m_proto.Name, dcc.m_proto.Name, self.m_atk - dcc.m_atk, DUELS[self.m_index][dcc.m_side]))
+            RemoveLifepoints(self.m_index, dcc.m_side, self.m_atk - dcc.m_atk)
+         elseif (self.m_atk < dcc.m_atk) then
+            self:Discard()
+            SendMessageToDuel(self.m_index, string.format("%s withstands %s's attack, destroying %s and dealing %d damage to %s's lifepoints!", dcc.m_proto.Name, self.m_proto.Name, self.m_proto.Name, dcc.m_atk - self.m_atk, DUELS[self.m_index][self.m_side]))
+            RemoveLifepoints(self.m_index, self.m_side, dcc.m_atk - self.m_atk)
+         elseif (self.m_atk == dcc.m_atk) then
+            self:Discard()
+            dcc:Discard()
+            SendMessageToDuel(self.m_index, string.format("%s and %s have equal attack points, destroying both monsters!", self.m_proto.Name, dcc.m_proto.Name))
+         end
+      else
+         if (self.m_atk > dcc.m_def) then
+            dcc:Discard()
+            SendMessageToDuel(self.m_index, string.format("%s destroys %s!", self.m_proto.Name, dcc.m_proto.Name, self.m_atk - dcc.m_atk))
+         elseif (self.m_atk < dcc.m_def) then
+            self:Discard()
+            SendMessageToDuel(self.m_index, string.format("%s withstands %s's attack, destroying %s!", dcc.m_proto.Name, self.m_proto.Name, self.m_proto.Name))
+         elseif (self.m_atk == dcc.m_def) then
+            SendMessageToDuel(self.m_index, string.format("%s's attack is equal to %s defense, no outcome.", self.m_proto.Name, dcc.m_proto.Name))
+         end
+      end
+   else
+      SendMessageToDuel(self.m_index, string.format("%s attacks %s's lifepoints directly, dealing %d damage!", self.m_proto.Name, DUELS[self.m_index][GetOppCon(self.m_side)], self.m_atk))
+      RemoveLifepoints(self.m_index, GetOppCon(self.m_side), self.m_atk)
+   end
+end
+
+--[[
+     Handles lifepoint modification, and creature destruction.
+     Creature animations handled in DoAttackAnims(tar).
+     Results and discarding is handled in impactFunc, that happens when a creature actually hits their target.
+--]]
+function DC_Creature:Attack(dcc)
+   if (not CALL_CARD_EVENT(EVENTS.ON_ATTACK, self.id, self.m_index, self.m_side, function() self:Attack(dcc) end, self, dcc)) then
+      return false
+   end
+   if (dcc ~= -1) then
+      if (dcc:IsFaceDown()) then dcc:SetFace(0); end
+      SendMessageToDuel(self.m_index, string.format("%s attacks %s:", self.m_proto.Name, dcc.m_proto.Name))
+   end
+   RestrictConsoleAccess(self.m_index, self.m_side, true) --restrict console access... we're attacking here.
+   self.hasAttacked = true
+   self:GetUnit():CreateLuaEvent(function() self:DoAttackAnims(dcc, impactFunc) end, 500, 1) --bit of delay between SetFace and this for safety.
+end
+
+--[[
+     Returns a new, default DuelCreature monster from the specified DCID bound to a GO.
+     (The GO is face down card / face up card)
+--]]
+function DC_Magic:Create(dcid, go)
+   local proto = DC_DB_CACHE[dcid] --proto contains static, default members.
+   if (not proto) then print("Error, tried to create Duel Creature with invalid DCID "..dcid); return; end
+   if (not go or not go:IsInWorld()) then 
+      print("Error, tried to create Duel Creature with invalid GO (DCID "..dcid..")")
+      return
+   end
+   local new = DC_Card:Create(dcid)
+   --the actual object has dynamic members, derived from proto
+   new.m_speed = 1 --spell cards: spell speed 1
+   if (proto.Type == CARD_TYPE.Trap) then --trap
+      new.m_speed = 2
+      if (proto.S_Type == TRAP_TYPE.Counter) then --counter-trap
+         new.m_speed = 3
+      end
+   elseif (proto.S_Type == SPELL_TYPE["Quick-play"]) then --quick-play spells
+      new.m_speed = 2
+   end
+   new.m_target = nil --creature target, used for various effects, and equip spells.
+   --m_speed = spell speed
+   new._go = go
+   setmetatable(new, magic_inherit)
+   return new
+end
+
+function DC_Magic:GetGO()
+   return self._go
+end
+
+function DC_Magic:Activate()
+   if (not CALL_CARD_EVENT(EVENTS.ON_MAGIC_ACTIVATED, self.id, self.m_index, self.m_side, function() self:Activate() end, self)) then
+      return false
+   end
+   self:SetFace(0)
+end
+
+function DC_Magic:SetFace(face)
+   assert(face == 0 or face == 1, "SetFace error: argument one must be 0 or 1")
+   if (self.m_face == face) then return; end
+   local player = GetPlayer(DUELS[self.m_index][self.m_side])
+   assert(player and player:IsInWorld() and player:IsAlive(), "SetFace error ("..self.id..")")
+   local x,y,z,o = par.FIELD.GetSlotPosition(self.m_proto.Type, self.m_side, self.m_slot)
+   local phase = self._go:GetPhase()
+   if (face == 0) then --go face-up!
+      self._go:Despawn(1, 0)
+      local dur = 5000; if (proto.S_Type == SPELL_TYPE.Continuous or proto.S_Type == SPELL_TYPE.Equip) then dur = 0; end
+      self._go = player:SpawnGameObject(nFaceUpCardGO, x, y, z, o, dur, 300, phase)
+      --SendMessageToDuel(self.m_index, self.m_proto.Name.." is activated!")
+   elseif (face == 1) then --go face-down!
+      self._go:Despawn(1, 0)
+      self._go = player:SpawnGameObject(nFaceDownCardGO, x, y, z, o, 0, 300, phase)
+      SendMessageToDuel(self.m_index, self.m_proto.Name.. " is set face-down!")
+   end
+   self.m_face = face
+end

@@ -1,0 +1,379 @@
+-----------------------
+--Made by Hypersniper--
+-----Project Ronin-----
+-----------------------
+
+local entries = {
+novice = 4,
+apprentice = 5,
+}
+
+local quest_id = 2
+
+local DEBUG = 1
+
+---------------STOP MODIFYING NOW ZOMG---------------
+
+TRAINEES = {}
+
+--Convenience funcs
+function CRA(u1,u2)
+   if (u1 == nil or u2 == nil) then return nil; end
+   return u1:CalcRadAngle(u1:GetX(), u1:GetY(), u2:GetX(), u2:GetY())
+end
+
+function IsFacingMe(u1,u2) --is u2 facing u1?
+   if (u1 == nil or u2 == nil) then return nil; end
+   return (math.abs(CRA(u2,u1)-u2:GetO()) < 0.3)
+end
+
+function DistTo2dPoint(x,y,x2,y2)
+   local posTar = {x, y}
+   local posNow = {x2, y2}
+   local distance = 0
+   for i,v in ipairs(posNow) do
+      distance = distance + (v-posTar[i])^2
+   end
+   return math.sqrt(distance) --yards
+end
+
+local function CHECK(pUnit, player, ...)
+   if (pUnit and player and player:IsInWorld() and player:IsAlive() and pUnit:GetDistanceYards(player) < 100) then
+      for i=1, select("#", ...) do
+         local exp = select(i, ...)
+         if (not exp) then
+            if (DEBUG) then print("CHECK failed: expression "..i.." was not satisfied."); end
+            return nil
+         end
+      end
+      return true
+   end
+   if (DEBUG) then
+      print("CHECK failed:")
+      print("   pUnit: "..tostring(pUnit))
+      print("   player: "..tostring(player))
+      if (tostring(player) ~= "nil") then
+         print("   player:IsInWorld(): "..tostring(player:IsInWorld()))
+         print("   player:IsAlive(): "..tostring(player:IsAlive()))
+         print("   pUnit:GetDistanceYards(player): "..tostring(pUnit:GetDistanceYards(player)))
+      end
+   end
+   if (TRAINEES[tostring(pUnit)] and (TRAINEES[tostring(pUnit)].waitingPlayer ~= nil or TRAINEES[tostring(pUnit)].hasBowed ~= nil)) then
+      pUnit:CreateLuaEvent(function() TRAINEES.PlayerEnd(pUnit, TRAINEES[tostring(pUnit)].pName) end, 100, 1)
+   end
+   return nil
+end
+
+--SUPER SRS BZNS HERE
+function SendFieldUpdatePacketToPlayer(obj, p, index, value)
+   local w = LuaPacket:CreatePacket(169, 1500) --SMSG_UPDATE_OBJECT
+   w:WriteULong(1)
+   w:WriteUByte(0) --UPDATETYPE_VALUES
+   w:WriteWoWGuid(obj)
+   local mBlocks = math.floor(index / 32) + 1
+   w:WriteUByte(mBlocks)
+   for i=(mBlocks-1),1,-1 do
+      w:WriteULong(0)
+   end
+   w:WriteULong( bit_shiftleft(1, (index % 32)) )
+   w:WriteULong(value)
+   p:SendPacketToPlayer(w)
+end
+
+--srs bzns begins
+function TRAINEES.FindPartner(pUnit)
+   local x = pUnit:GetX()+5*math.cos(pUnit:GetO())
+   local y = pUnit:GetY()+5*math.sin(pUnit:GetO())
+   local z = pUnit:GetZ()--pUnit:GetLandHeight(x,y)
+   local p = pUnit:GetCreatureNearestCoords(x, y, z, entries.novice)
+   local q = pUnit:GetCreatureNearestCoords(x, y, z, entries.apprentice)
+   local ret
+   if (IsFacingMe(pUnit,p) and tostring(p) ~= tostring(pUnit)) then
+      ret = p
+   else
+      ret = q
+   end
+   return ret
+end
+
+function TRAINEES.LeaveCombat(pUnit, e, p)
+   if (DistTo2dPoint(pUnit:GetX(), pUnit:GetY(), pUnit:GetSpawnX(), pUnit:GetSpawnY()) >= 45) then
+      pUnit:SendChatMessage(12, 0, "Fine! Just run away then!")
+      pUnit:CreateLuaEvent(function() TRAINEES.PlayerEnd(pUnit, TRAINEES[tostring(pUnit)].pName) end, 100, 1)
+   end
+end
+
+function TRAINEES.Spawn(pUnit) --in range set isn't there instantly.
+   pUnit:RegisterEvent(TRAINEES.realSpawn, 100, 1)
+end
+
+function TRAINEES.realSpawn(pUnit)
+   if (TRAINEES[tostring(pUnit)] == nil) then
+      TRAINEES[tostring(pUnit)] = {}
+      TRAINEES[tostring(pUnit)].partner = TRAINEES.FindPartner(pUnit)
+      if (TRAINEES[tostring(pUnit)].partner == nil) then print("Error; cannot find partner, restarting server may fix this"); return; end
+   end
+   pUnit:SetOutOfCombatRange(2500) --50 yards
+   pUnit:SetStandState(0)
+   pUnit:SetCombatCapable(false)
+   pUnit:SetMovementFlags(0)
+   pUnit:SetFaction(35)
+   pUnit:SetUInt32Value(UNIT_FIELD_FLAGS, 0)
+   pUnit:CreateLuaEvent(function() TRAINEES.AttackEachOther(pUnit, TRAINEES[tostring(pUnit)].partner) end, math.random(3000, 6000), 1)
+end
+
+function TRAINEES.OnGossip(pUnit, event, player)
+   if (TRAINEES[tostring(player)] == nil) then
+      pUnit:GossipCreateMenu(65536, player, 0)
+      pUnit:GossipMenuAddItem(9, "Care to spar?", 20, 0)
+      pUnit:GossipMenuAddItem(0, "Never mind.", 21, 0)
+      pUnit:GossipSendMenu(player)
+   else
+      pUnit:GossipCreateMenu(65536, player, 0)
+      pUnit:GossipSendMenu(player)
+   end
+end
+
+function TRAINEES.OnGossipSelect(pUnit, event, player, id, intid, code)
+   if (intid == 21) then
+      player:GossipComplete()
+   elseif (intid == 20) then
+      player:GossipComplete()
+      pUnit:RemoveAllAuras(); pUnit:SetStandState(0); pUnit:SetHealth(pUnit:GetMaxHealth());
+      local part = TRAINEES[tostring(pUnit)].partner
+      if (part:IsInCombat()) then
+         part:WipeTargetList(); part:WipeThreatList();
+         part:SetUInt32Value(UNIT_NPC_FLAGS, 0x01)
+      end
+      pUnit:RemoveEvents()
+      part:RemoveEvents()
+      part:SetStandState(1) --sit.
+      pUnit:SetUInt32Value(UNIT_NPC_FLAGS, 0)
+      part:SetUInt32Value(UNIT_NPC_FLAGS, 0)
+      TRAINEES[tostring(pUnit)].pName = player:GetName()
+      pUnit:SendChatMessage(12, 0, "Alright, "..player:GetName()..", just bow when you're ready.")
+      pUnit:Emote(2, 1500)
+      pUnit:CreateLuaEvent(function() TRAINEES.expireWaiting(pUnit, player, 0) end, 20000, 1)
+      TRAINEES[tostring(pUnit)].waitingPlayer = player
+      TRAINEES[tostring(player)] = true
+   end
+end
+
+function TRAINEES.OnEmote(pUnit, event, player, emoteId)
+   local t = TRAINEES[tostring(pUnit)]
+   if (t == nil or t.hasBowed ~= nil) then
+      return
+   elseif (t.waitingPlayer ~= nil) then
+      if (tostring(t.waitingPlayer) == tostring(player) and emoteId == 2) then --correct player and bowing
+         pUnit:RemoveEvents()
+         pUnit:SendChatMessageToPlayer(42, 0, "Get ready to spar!", player)
+         TRAINEES[tostring(pUnit)].hasBowed = true
+         TRAINEES[tostring(pUnit)].waitingPlayer = nil
+         pUnit:CreateLuaEvent(function() TRAINEES.Countdown(pUnit, player, 4) end, 3000, 1)
+      end
+   end   
+end
+
+function TRAINEES.Countdown(pUnit, player, countdown)
+   if (not CHECK(pUnit,player)) then return; end
+   if (countdown < 4 and countdown > 0) then
+      pUnit:SendChatMessageToPlayer(42, 0, countdown, player)
+      pUnit:CreateLuaEvent(function() TRAINEES.Countdown(pUnit, player, countdown - 1) end, 1200, 1)
+   elseif (countdown > 3) then
+      TRAINEES.Countdown(pUnit, player, 3)
+   else
+      pUnit:AttackReaction(player, 50000, 0)
+   end
+end
+
+function TRAINEES.expireWaiting(pUnit, player, elapsed)
+   if (not CHECK(pUnit,player)) then return; end
+   if (TRAINEES[tostring(pUnit)].hasBowed ~= nil) then 
+      return
+   end
+   elapsed = elapsed + 20000
+   if (elapsed == 20000) then
+      pUnit:SendChatMessage(12, 0, "Are we sparring or what?")
+      pUnit:CreateLuaEvent(function() TRAINEES.expireWaiting(pUnit, player, elapsed) end, 20000, 1)
+   elseif (elapsed == 40000) then
+      pUnit:SendChatMessage(12, 0, "I grow tired of your delays, "..player:GetName()..".")
+      pUnit:CreateLuaEvent(function() TRAINEES.expireWaiting(pUnit, player, elapsed) end, 20000, 1)
+   elseif (elapsed == 60000) then
+      pUnit:SendChatMessage(12, 0, "I'm not going to waste any more time with you, "..player:GetName()..". Come back when you're ready.")
+      pUnit:RemoveEvents()
+      pUnit:SetUInt32Value(UNIT_NPC_FLAGS, 0x01)
+      TRAINEES[tostring(player)] = nil
+      TRAINEES[tostring(pUnit)].waitingPlayer = nil
+      pUnit:RegisterEvent(TRAINEES.Spawn, 20000+math.random(2000), 1)
+      local part = TRAINEES[tostring(pUnit)].partner
+      part:SetStandState(0)
+      part:SetUInt32Value(UNIT_NPC_FLAGS, 0x01)
+      part:RegisterEvent(TRAINEES.Spawn, 20000+math.random(2000), 1)
+   end
+end
+
+function TRAINEES.PlayerEnd(pUnit, pName)
+   pUnit:RemoveEvents()
+   local pTarget = GetPlayer(pName)
+   pTarget:SetUInt32Value(PLAYER_FLAGS, bit_and(pTarget:GetUInt32Value(PLAYER_FLAGS),bit_not(0x40)))
+   pUnit:SetMovementFlags(1)
+   pUnit:SetFaction(35)
+   pUnit:SetUInt32Value(UNIT_NPC_FLAGS, 0x01)
+   pUnit:RemoveAllAuras()
+   pUnit:SetAIState(0)
+   pUnit:CreateLuaEvent(function() TRAINEES.postStopKilling(pUnit, pTarget) end, 2500, 1)
+   local part = TRAINEES[tostring(pUnit)].partner
+   part:SetStandState(0)
+   part:SetUInt32Value(UNIT_NPC_FLAGS, 0x01)
+   part:RegisterEvent(TRAINEES.Spawn, 20000+math.random(2000), 1)
+   TRAINEES[tostring(pUnit)].hasBowed = nil
+   TRAINEES[tostring(pUnit)].waitingPlayer = nil
+   TRAINEES[tostring(pTarget)] = nil
+end
+
+function TRAINEES.AttackEachOther(pUnit, partner)
+   pUnit:RemoveEvents()
+   partner:RemoveEvents()
+   pUnit:AttackReaction(partner, 1000, 0)
+end
+
+function TRAINEES.Combat(pUnit, event, pTarget)
+   pUnit:SetUInt32Value(UNIT_NPC_FLAGS, 0)
+   if (pTarget:IsPlayer()) then
+      pUnit:SetUInt32Value(UNIT_FIELD_FLAGS, UNIT_FLAG_NOT_ATTACKABLE_2)
+      pUnit:SetFaction(14)
+      pUnit:CreateLuaEvent(function() SendFieldUpdatePacketToPlayer(pUnit, pTarget, UNIT_FIELD_FLAGS, 0) end, 500, 1)
+      pTarget:SetUInt32Value(PLAYER_FLAGS, bit_or(pTarget:GetUInt32Value(PLAYER_FLAGS),0x40))
+   end
+   if (pUnit:GetEntry() == entries.novice) then
+      pUnit:CastSpell(30470) --slice and dice
+   else
+      pUnit:CreateLuaEvent(function() TRAINEES.CheckOpponent80(pUnit, pTarget) end, 1000, 0)
+   end
+end
+
+function TRAINEES.End(pUnit, pTarget) --after fake die.
+   if (TRAINEES[tostring(pUnit)].isWinner[1] == true) then --I won!
+      if (pTarget:IsPlayer()) then
+         pUnit:SetCombatMeleeCapable(false); pUnit:SetCombatCapable(false)
+         pUnit:SetUInt32Value(UNIT_FIELD_FLAGS, 0)
+         pTarget:Emote(20, 2000)
+         pUnit:Emote(4, 2000) --EMOTE_ONESHOT_CHEER
+         TRAINEES.PlayerEnd(pUnit, TRAINEES[tostring(pUnit)].pName)
+      else
+         pUnit:SetCombatMeleeCapable(false); pUnit:SetCombatCapable(false)
+         pUnit:SetUInt32Value(UNIT_FIELD_FLAGS, 0)
+         pTarget:SetCombatMeleeCapable(false); pTarget:SetCombatCapable(false)
+         pTarget:SetUInt32Value(UNIT_FIELD_FLAGS, 0)
+         pUnit:SetMovementFlags(1); pTarget:SetMovementFlags(1);
+         pUnit:Emote(4, 2000); pTarget:Emote(20, 2000) --EMOTE_ONESHOT_CHEER, EMOTE_ONESHOT_BEG
+         pUnit:CreateLuaEvent(function() TRAINEES.postStopKilling(pUnit, pTarget) end, 2500, 1)
+      end
+   else --pTarget won
+      if (pTarget:IsPlayer()) then
+         pUnit:SetCombatMeleeCapable(false); pUnit:SetCombatCapable(false)
+         pUnit:SetUInt32Value(UNIT_FIELD_FLAGS, 0)
+         pTarget:Emote(4, 2000)
+         pUnit:Emote(20, 2000) --EMOTE_ONESHOT_BEG
+         pUnit:SendChatMessage(12, 0, "Gah! Well played, "..pTarget:GetName()..".")
+         TRAINEES.PlayerEnd(pUnit, TRAINEES[tostring(pUnit)].pName)
+      else
+         pUnit:SetCombatMeleeCapable(false); pUnit:SetCombatCapable(false)
+         pUnit:SetUInt32Value(UNIT_FIELD_FLAGS, 0)
+         pTarget:SetCombatMeleeCapable(false); pTarget:SetCombatCapable(false)
+         pTarget:SetUInt32Value(UNIT_FIELD_FLAGS, 0)
+         pUnit:SetMovementFlags(1); pTarget:SetMovementFlags(1);
+         pTarget:Emote(4, 2000); pUnit:Emote(20, 2000); --EMOTE_ONESHOT_CHEER, EMOTE_ONESHOT_BEG
+         pUnit:CreateLuaEvent(function() TRAINEES.postStopKilling(pTarget, pUnit) end, 2500, 1)
+      end
+   end
+end
+
+function TRAINEES.postStopKilling(pUnit, pTarget)
+   if (pUnit:IsCreature()) then
+      pUnit:SetUInt32Value(UNIT_FIELD_FLAGS, UNIT_FLAG_NOT_ATTACKABLE_2)
+      pUnit:RegisterEvent(TRAINEES.PostEnd, 500, 0)
+      local hp = 1
+      if (TRAINEES[tostring(pUnit)].isWinner) then hp = TRAINEES[tostring(pUnit)].isWinner[2]; end
+      pUnit:SetHealth(hp)
+   end
+   if (pTarget:IsCreature()) then
+      pTarget:SetUInt32Value(UNIT_FIELD_FLAGS, UNIT_FLAG_NOT_ATTACKABLE_2)
+      pTarget:RegisterEvent(TRAINEES.PostEnd, 500, 0)
+      local hp = 1
+      if (TRAINEES[tostring(pTarget)].isWinner) then hp = TRAINEES[tostring(pTarget)].isWinner[2]; end
+      pTarget:SetHealth(hp)
+   end
+end
+
+function TRAINEES.PostEnd(pUnit)
+   if (pUnit:GetX() == pUnit:GetSpawnX() and pUnit:GetY() == pUnit:GetSpawnY()) then
+      pUnit:RemoveEvents()
+      TRAINEES[tostring(pUnit)].isWinner = nil
+      TRAINEES[tostring(pUnit)].waitingPlayer = nil
+      TRAINEES[tostring(pUnit)].hasBowed = nil
+      pUnit:SetUInt32Value(UNIT_NPC_FLAGS, 0x01)
+      pUnit:SetStandState(1) --sit
+      pUnit:EventCastSpell(pUnit, 434, 1500, 1) --fudz!
+      pUnit:RegisterEvent(TRAINEES.Spawn, 20000+math.random(2000), 1)
+   end
+end
+
+function TRAINEES.CheckOpponent80(pUnit, pTarget)
+   if (pTarget:GetHealthPct() <= 80) then
+      pUnit:CastSpell(50054) --quick feet
+      pUnit:RemoveEvents()
+   end
+end
+
+function TRAINEES.okStopKillingMeNow(event, killer, victim)
+   local pUnit, pTarget
+   if (killer:IsCreature()) then
+      if (killer:GetEntry() ~= entries.novice and killer:GetEntry() ~= entries.apprentice) then
+         return 1
+      end
+      if (TRAINEES[tostring(killer)].isWinner ~= nil) then killer:WipeTargetList(); killer:WipeThreatList(); killer:SetAIState(0); return 0; end
+      TRAINEES[tostring(killer)].isWinner = {true, killer:GetHealth()}
+      TRAINEES[tostring(victim)].isWinner = {false, 1}
+      killer:RemoveEvents()
+      pUnit = killer; pTarget = victim;
+   elseif (victim:IsCreature()) then
+      if (victim:GetEntry() ~= entries.novice and victim:GetEntry() ~= entries.apprentice) then
+         return 1
+      end
+      if (TRAINEES[tostring(victim)].isWinner ~= nil) then victim:WipeTargetList(); victim:WipeThreatList(); victim:SetAIState(0); return 0; end
+      if (killer:IsCreature()) then TRAINEES[tostring(killer)].isWinner = {true, killer:GetHealth()}; end
+      TRAINEES[tostring(victim)].isWinner = {false, 1}
+      victim:RemoveEvents()
+      pUnit = victim; pTarget = killer;
+   else
+      return 1
+   end
+   if (killer:IsCreature()) then
+      killer:SetUInt32Value(UNIT_FIELD_FLAGS, UNIT_FLAG_NOT_SELECTABLE)
+      killer:RemoveAllAuras()
+      killer:SetAIState(0); killer:WipeTargetList(); killer:WipeThreatList(); 
+      killer:SetCombatCapable(true)
+      killer:SetFaction(35)
+   end
+   if (victim:IsCreature()) then
+      victim:SetUInt32Value(UNIT_FIELD_FLAGS, UNIT_FLAG_NOT_SELECTABLE)
+      victim:RemoveAllAuras()
+      victim:SetAIState(0); victim:WipeTargetList(); victim:WipeThreatList();
+      victim:SetCombatCapable(true)
+      if (killer:IsPlayer()) then victim:ReturnToSpawnPoint(); end
+      victim:SetFaction(35)
+   end
+   pUnit:CreateLuaEvent(function() TRAINEES.End(pUnit, pTarget) end, 500, 1)
+   return 0
+end
+
+for k,v in pairs(entries) do
+   RegisterUnitEvent(v, 22, TRAINEES.OnEmote)
+   RegisterUnitEvent(v, 18, TRAINEES.Spawn)
+   RegisterUnitEvent(v, 2, TRAINEES.LeaveCombat)
+   RegisterUnitEvent(v, 1, TRAINEES.Combat)
+   RegisterUnitGossipEvent(v, 1, TRAINEES.OnGossip)
+   RegisterUnitGossipEvent(v, 2, TRAINEES.OnGossipSelect)
+end
+RegisterServerHook(28, TRAINEES.okStopKillingMeNow)

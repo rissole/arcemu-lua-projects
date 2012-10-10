@@ -1,0 +1,9 @@
+﻿## Interface: 32000
+## Title: NetGraph3
+## Notes: Provides bandwidth and framerate information.
+## Author: Hypersniper
+## Version: 1.0
+## X-eMail: hypersniper@ymail.com
+
+xml.xml
+lua.lua

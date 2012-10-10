@@ -1,0 +1,144 @@
+-----------------------
+--Made by Hypersniper--
+-----Project Ronin-----
+-----------------------
+
+local nSaki    = 70
+local nTai     = 71
+
+local nMaria   = 73
+local nSirk    = 74
+local nPercy   = 75
+
+local nKishi   = 76
+local nMortak  = 77
+
+local nLucy    = 161
+local nSilac   = 162
+local nGangly  = 163
+
+local function GetLocalCreature(u, entry)
+	local x,y,z = u:GetLocation()
+	local crc = u:GetCreatureNearestCoords(x,y,z,entry)
+	return crc
+end
+
+local function FaceUnit(u, t)
+   if (not u or not t) then return; end
+   u:SetFacing(u:CalcRadAngle(u:GetX(),u:GetY(),t:GetX(),t:GetY()))
+end
+
+--CONVERSATION #1
+local _CONVO_ONE_CAN_GO = true
+
+function ConvoOne_Trigger(pUnit)
+   if (not _CONVO_ONE_CAN_GO) then return; end
+   for _,v in pairs(pUnit:GetInRangePlayers()) do
+      if (pUnit:GetDistanceYards(v) <= 10) then
+         _CONVO_ONE_CAN_GO = false
+         if (v:GetLevel() == 1) then
+            pUnit:RegisterEvent(function () ConvoOne_Chats1(pUnit, v); end, 1000, 1)
+         elseif (v:GetLevel() >= 2) then
+            if (v:GetGender() == 0) then --male
+               pUnit:RegisterEvent(function () ConvoOne_Chats2(pUnit, v); end, 1000, 1)
+            else --female
+               pUnit:RegisterEvent(function () ConvoOne_Chats3(pUnit, v); end, 1000, 1)
+            end
+         end
+      end
+   end
+end
+
+function ConvoOne_Chats1(pTai, player) --Level 1
+   local pSaki = GetLocalCreature(pTai, nSaki)
+   if (not pSaki) then return; end
+   pSaki:SendChatMessage(12, 0, "Oh look Tai, here comes another one...")
+   pTai:EventChat(12, 0, "Great, another weakling that will just take up space.", 5000)
+   pSaki:EventChat(12, 0, "Now now, don't be so hard on them.", 10000)
+   pTai:RegisterEvent(function() _CONVO_ONE_CAN_GO = true; end, 40000, 1)
+end
+
+function ConvoOne_Chats2(pTai, player) --Level 2, male
+   local pSaki = GetLocalCreature(pTai, nSaki)
+   if (not pSaki or not player or not player:IsInWorld()) then return; end
+   pTai:SendChatMessage(12, 0, "Looking good stranger!")
+   FaceUnit(pTai, player)
+   local function part2()
+      pSaki:SendChatMessage(12, 0, "Flirting so soon after your last break-up?")
+      pTai:SetFacing(pTai:GetSpawnO())
+   end
+   pTai:RegisterEvent(part2, 5000, 1)
+   pTai:EventChat(12, 0, "Shush, that wasn't even a real relationship.", 10000)
+   pSaki:EventChat(12, 0, "That's what you said about the last seven...", 15000)
+   pTai:EventChat(16, 0, pTai:GetName().." glares at Saki.", 20000)
+   pTai:RegisterEvent(function() _CONVO_ONE_CAN_GO = true; end, 50000, 1)
+end
+
+function ConvoOne_Chats3(pTai, player) --Level 2, female
+   local pSaki = GetLocalCreature(pTai, nSaki)
+   if (not pSaki) then return; end
+   pSaki:SendChatMessage(12, 0, "... I wish I was strong enough to travel alone like her.")
+   pTai:EventChat(12, 0, "Keep dreaming, Saki. We're going to be stuck here for quite some time.", 5000)
+   pSaki:EventChat(12, 0, "One day we'll get out of here, I know it.", 10000)
+   pTai:RegisterEvent(function() _CONVO_ONE_CAN_GO = true; end, 40000, 1)
+end
+
+--CONVERSATION #2
+function ConvoTwo_Trigger(pUnit)
+   pUnit:RegisterEvent(ConvoTwo_Go, 10 * 60 * 1000, 0)
+end
+
+function ConvoTwo_Go(p74)
+   if (math.random(5) ~= 5) then return; end
+   local p75 = GetLocalCreature(p74, nPercy)
+   local p73 = GetLocalCreature(p74, nMaria)
+   if (not p75 or not p73) then return; end
+   p74:SendChatMessage(12, 0, "Eat up friends, this meal is on me.")
+   p75:EventChat(12, 0, "And it may very well be our last, so be sure to enjoy it.", 5000)
+   p73:EventChat(12, 0, "Oh hush you old coward. Didn't you see the guards outside? There's no way those barbaric demons will get in here.", 10000)
+   p75:EventChat(12, 0, "They don't have to... they just have to keep us from getting supplies. It's only a matter of time before we slowly starve to death.", 15000)
+   p73:EventChat(12, 0, "Jeez, you sure know how to ruin a free meal...", 20000)
+   p74:EventChat(12, 0, "If you two don't shut up I'm going to eat this whole thing myself!", 25000)
+   p73:EventChat(12, 0, "Never mind!", 28000)
+   p75:EventChat(12, 0, "Never mind!", 28000)
+end
+
+--CONVERSATION #3
+function ConvoThree_Trigger(pUnit)
+   pUnit:RegisterEvent(ConvoThree_Go, 7 * 60 * 1000, 0)
+end
+
+function ConvoThree_Go(p76)
+   if (math.random(7) ~= 7) then return; end
+   local p77 = GetLocalCreature(p76, nMortak)
+   if (not p77) then return; end
+   p77:SendChatMessage(12, 0, "So... how is everything?")
+   p76:EventChat(12, 0, "Terrible! Just awful! You call yourself a bodyguard and yet you say we're stuck here until the demons are all gone!", 5000)
+   p77:EventChat(12, 0, "Have you seen how many are out there? There's no way I could protect you from all of them!", 10000)
+   p76:EventChat(12, 0, "Heh, yeah, whatever...", 15000)
+   p77:EventChat(12, 0, "I'm sorry, but we'll just have to wait.", 20000)
+end
+
+--CONVERSATION #4
+function ConvoFour_Trigger(pUnit)
+   pUnit:RegisterEvent(ConvoFour_Go, 10 * 60 * 1000, 0)
+end
+
+function ConvoFour_Go(p163)
+   if (math.random(5) ~= 5) then return; end
+   local p162 = GetLocalCreature(p163, nSilac)
+   local p161 = GetLocalCreature(p163, nLucy)
+   if (not p162 or not p161) then return; end
+   p163:SendChatMessage(12, 0, "Hey, that gal with the hat is kinda cute. You should make a pass at her, hehe.")
+   p162:EventChat(12, 0, "Shhh! Keep yer voice down ya fool!", 5000)
+   p162:EventChat(12, 0, "'Sides, she's way outta my league.", 10000)
+   p163:EventChat(12, 0, "Not at all, Blinky. Just go over there and talk to her... she looks lonely. She probably needs a good man.", 15000)
+   p162:EventChat(12, 0, "Don't call me that!", 20000)
+   p161:EventChat(12, 0, "Will you two idiots keep it down over there!", 25000)
+   p163:EventChat(12, 0, "... Now ya dun' an' pissed her off.", 30000)
+end
+
+RegisterUnitEvent(nTai, 18, ConvoOne_Trigger)
+RegisterUnitEvent(nSirk, 18, ConvoTwo_Trigger)
+RegisterUnitEvent(nKishi, 18, ConvoThree_Trigger)
+RegisterUnitEvent(nGangly, 18, ConvoFour_Trigger)

@@ -1,0 +1,867 @@
+---------------------------
+----MODIFY STARTS HERE-----
+---------------------------
+
+--todo: uncomment graduated gossip, set yuna fallen height
+
+local DOME_ENTRY = 1 --the game object dome that surrounds players
+local MIMI_ENTRY = 500 --replace with entries
+local GAREN_ENTRY = 501
+local YUNA_ENTRY = 502
+local YUNA_TELEROCK_ENTRY = 400 --the game object that players will right click to tele up to Yuna
+local CAIN_ENTRY = 503
+local REI_ENTRY = 504
+local BATO_ENTRY = 505
+local DEBUG = 1 --set to 1 to enable debug messages
+
+local trialsDb = {} --no modify
+trialsDb[MIMI_ENTRY] = {} --no modify
+trialsDb[GAREN_ENTRY] = {} --no modify
+trialsDb[YUNA_ENTRY] = {} --no modify
+trialsDb[REI_ENTRY] = {} --no modify
+trialsDb[BATO_ENTRY] = {} --no modify
+trialsDb[CAIN_ENTRY] = {} --no modify
+trialsDb[MIMI_ENTRY].senseiString = "a" --no modify
+trialsDb[GAREN_ENTRY].senseiString = "b" --no modiffy
+trialsDb[YUNA_ENTRY].senseiString = "c" --no modify
+trialsDb[CAIN_ENTRY].senseiString = "d" --no modify
+trialsDb[REI_ENTRY].senseiString = "e" --no modify
+trialsDb[BATO_ENTRY].senseiString = "f" --no modify
+trialsDb[MIMI_ENTRY].name = "mimi" --no modify
+trialsDb[GAREN_ENTRY].name = "garen" --no modiffy
+trialsDb[YUNA_ENTRY].name = "yuna" --no modify
+trialsDb[CAIN_ENTRY].name = "cain" --no modify
+trialsDb[REI_ENTRY].name = "rei" --no modify
+trialsDb[BATO_ENTRY].name = "bato" --no modify
+
+--------------------------------------------------------
+--Settings. If you need any more per-trainer customisation, let me know.
+
+trialsDb[MIMI_ENTRY].rank = 1 --rank they train from
+trialsDb[GAREN_ENTRY].rank = 1
+trialsDb[YUNA_ENTRY].rank = 2
+trialsDb[CAIN_ENTRY].rank = 2
+trialsDb[REI_ENTRY].rank = 3
+trialsDb[BATO_ENTRY].rank = 3
+
+trialsDb[MIMI_ENTRY].preReqQuest = 28 --the quest ID that has to be turned in before the fight
+trialsDb[GAREN_ENTRY].preReqQuest = 28
+trialsDb[YUNA_ENTRY].preReqQuest = 28 --you can make it 0 if no quest is pre-required.
+trialsDb[CAIN_ENTRY].preReqQuest = 28
+trialsDb[REI_ENTRY].preReqQuest = 28
+trialsDb[BATO_ENTRY].preReqQuest = 28
+
+trialsDb[MIMI_ENTRY].reqKills = 10 --100 --kills needed for the rank
+trialsDb[GAREN_ENTRY].reqKills = 10 --100
+trialsDb[YUNA_ENTRY].reqKills = 50 --500
+trialsDb[CAIN_ENTRY].reqKills = 50 --500
+trialsDb[REI_ENTRY].reqKills = 100 --1000
+trialsDb[BATO_ENTRY].reqKills = 100 --1000
+
+trialsDb[MIMI_ENTRY].wrongRankId = 1 --npc_text entry for Talking to when they are the wrong rank. ex. "I'm sorry, $N, but I only train Rank 1 Ronin."
+trialsDb[GAREN_ENTRY].wrongRankId = 1
+trialsDb[YUNA_ENTRY].wrongRankId = 1
+trialsDb[CAIN_ENTRY].wrongRankId = 1
+trialsDb[REI_ENTRY].wrongRankId = 1
+trialsDb[BATO_ENTRY].wrongRankId = 1
+
+trialsDb[MIMI_ENTRY].alreadyDefeatedId = 2 --npc_text entry for Talking to whoever after they've already beaten. ex. "You've already beaten me, perhaps try Garen."
+trialsDb[GAREN_ENTRY].alreadyDefeatedId = 2
+trialsDb[YUNA_ENTRY].alreadyDefeatedId = 2
+trialsDb[CAIN_ENTRY].alreadyDefeatedId = 2
+trialsDb[REI_ENTRY].alreadyDefeatedId = 2
+trialsDb[BATO_ENTRY].alreadyDefeatedId = 2
+
+trialsDb[MIMI_ENTRY].readyToStartId = 3 --npc_text entry for Talking to whoever when you have enough kills. ex. "You've done well, $N. Just say the word and we'll begin."
+trialsDb[GAREN_ENTRY].readyToStartId = 3
+trialsDb[YUNA_ENTRY].readyToStartId = 3
+trialsDb[CAIN_ENTRY].readyToStartId = 3
+trialsDb[REI_ENTRY].readyToStartId = 3
+trialsDb[BATO_ENTRY].readyToStartId = 3
+
+trialsDb[MIMI_ENTRY].notEnoughKillsId = 4 --npc_text entry for Talking to whoever when you don't have enough kills. ex. "Remember $N, 100 slain warriors until I'll train you."
+trialsDb[GAREN_ENTRY].notEnoughKillsId = 4
+trialsDb[YUNA_ENTRY].notEnoughKillsId = 4
+trialsDb[CAIN_ENTRY].notEnoughKillsId = 4
+trialsDb[REI_ENTRY].notEnoughKillsId = 4
+trialsDb[BATO_ENTRY].notEnoughKillsId = 4
+
+--[[-----------------------
+----------NOTES------------
+---------------------------
+
+trial info
+An npc will mark where each Master will move to upon initiating the trial. You must place them, and also add them to DB.
+Each waypoint npc should be named: "Trials - NPCNAME Waypoint"
+where NPCNAME is the applicable npc's FULL NAME. eg "Garen Thunderblade" not just "Garen".
+
+An npc will mark where each Master will move unwanted players to upon initiating the trial. You must place them, and also add them to DB.
+Each waypoint npc should be named: "Trials - NPCNAME Ptele Waypoint"
+where NPCNAME is the applicable npc's FULL NAME. eg "Garen Thunderblade" not just "Garen".
+
+An npc will mark where each player should be positioned before the master will bow. You must place them, and also add them to DB.
+Each waypoint npc should be named: "Trials - NPCNAME Player Waypoint"
+where NPCNAME is the applicable npc's FULL NAME. eg "Garen Thunderblade" not just "Garen".
+
+There WILL be quests for each rank. A spell will be cast at the end of each fight when the player wins.
+This will clear the objective of the quest.
+So for each rank, one sensei will cast 52852 and the other will cast 52994.
+Your quest should require both of those spells as the objectives. They are just dummy spells that do nothing.
+
+Please make each pair of senseis have consecutive entry ids. As in 101 and 102. This is for determining which victory spell to cast.
+
+YUNA: Needs 8 waypoints placed on the circumference of the columns, named "Trials - Yuna Column WayNUMBER" eg Trials - Yuna Column Way4
+Please put "Trials - Yuna Column Way1" on top of "Trials - Yuna Shikan Waypoint" - make those two waypoints have the same position.
+One game object rock needs to be spawned that teleports the players back up if they fall. It can be anything you wish.
+
+REI: Needs 6 NPCs to be used as waypoints placed wherever you want - just name them "Trials - Rei Attack WayX" (where X is the number, 1-6).
+
+
+---------------------------
+---------END NOTES---------
+-----------------------]]--
+
+---------------------------
+--DO NOT MODIFY PAST HERE--...except maybe some messages.
+---------------------------
+
+TRIALS = {}
+TRIALS.mimi = {}
+TRIALS.garen = {}
+TRIALS.yuna = {}
+TRIALS.cain = {}
+TRIALS.rei = {}
+TRIALS.bato = {}
+math.randomseed(os.time()); math.random(); math.random(); math.random();
+
+function TRIALS.getSenseiString(player)
+   local res = CharDBQuery("SELECT senseis_defeated FROM ronin WHERE name = '"..player:GetName().."'")
+   if (res == nil) then
+      CharDBQuery("INSERT INTO `ronin` (`name`) VALUES ('"..player:GetName().."')")
+      return ""
+   end
+   local s = res:GetColumn(0):GetString()
+   return s
+end
+
+function TRIALS.findWaypoint(pUnit, name)
+   local mytab = {}
+   for k,v in pairs(pUnit:GetInRangeUnits()) do
+      if (v:GetName() == name) then
+         mytab.x = v:GetX()
+         mytab.y = v:GetY()
+         mytab.z = v:GetZ()
+         mytab.o = v:GetO()
+         mytab.unit = v
+         break
+      end
+   end
+   return mytab
+end
+
+function TRIALS.yuna.GetClosestWay(pUnit)
+   local d1 = 0
+   local d2 = 999999
+   local ret = {}
+   for k,v in pairs(pUnit:GetInRangeUnits()) do
+      if (string.find(v:GetName(), "Yuna Column Way") ~= nil) then
+         d1 = pUnit:GetDistanceYards(v)
+         if (d1 < d2) then 
+            d2 = d1
+            ret.x = v:GetX()
+            ret.y = v:GetY()
+            ret.z = v:GetZ()
+            ret.o = v:GetO()
+            ret.unit = v
+            ret.int = tonumber(string.sub(v:GetName(),-1,-1))
+         end
+      end
+   end
+   return ret
+end
+
+local function CHECK(pUnit, player, ...)
+   if (pUnit and player and player:IsInWorld() and player:IsAlive() and pUnit:GetDistanceYards(player) < 100) then
+      for i=1, select("#", ...) do
+         local exp = select(i, ...)
+         if (not exp) then
+            if (DEBUG) then print("CHECK failed: expression "..i.." was not satisfied."); end
+            return nil
+         end
+      end
+      return true
+   end
+   if (DEBUG) then
+      print("CHECK failed:")
+      print("   pUnit: "..tostring(pUnit))
+      print("   player: "..tostring(player))
+      if (tostring(player) ~= "nil") then
+         print("   player:IsInWorld(): "..tostring(player:IsInWorld()))
+         print("   player:IsAlive(): "..tostring(player:IsAlive()))
+         print("   pUnit:GetDistanceYards(player): "..tostring(pUnit:GetDistanceYards(player)))
+      end
+   end
+   if (TRIALS[tostring(pUnit)] and TRIALS[tostring(pUnit)].inTrial ~= nil) then
+      pUnit:CreateLuaEvent(function() TRIALS.endTrial(pUnit, TRIALS[tostring(pUnit)].pName) end, 100, 1)
+   end
+   return nil
+end
+
+function TRIALS.OnSpawn(pUnit)
+   local res = WorldDBQuery("SELECT `npcflags` FROM `creature_proto` WHERE `entry`='"..pUnit:GetEntry().."'")
+   local def_flags = res:GetColumn(0):GetLong()
+   pUnit:SetUInt32Value(UNIT_NPC_FLAGS, def_flags) --UNIT_NPC_FLAGS
+   pUnit:SetUInt32Value(UNIT_FIELD_FLAGS, 0) --UNIT_FIELD_FLAGS, NONE
+   local function waitasec()
+      r = WorldDBQuery("SELECT position_x,position_y,position_z,orientation FROM creature_spawns WHERE id='"..pUnit:GetSpawnId().."'"); 
+      pUnit:SetPosition(r:GetColumn(0):GetLong(), r:GetColumn(1):GetLong(),r:GetColumn(2):GetLong(), r:GetColumn(3):GetLong())
+   end
+   pUnit:CreateLuaEvent(waitasec, 200, 1)
+end
+
+function TRIALS.OnGossipTalk(pUnit, event, player)
+   local ent = pUnit:GetEntry()
+   local sensei_string = TRIALS.getSenseiString(player)
+   pUnit:StopMovement(1)
+   if (player:GetPlayerLevel() < trialsDb[ent].rank) then --low rank, noob
+      pUnit:GossipCreateMenu(trialsDb[ent].wrongRankId, player, 0)
+      pUnit:GossipSendMenu(player)
+   --[[elseif (player:GetPlayerLevel() > trialsDb[ent].rank) then --you've graduated this guy
+      pUnit:GossipCreateMenu(trialsDb[ent].alreadyDefeatedId, player, 0)
+      pUnit:GossipMenuAddItem(3, "What techniques can you teach me?", 22, 0)
+      pUnit:GossipSendMenu(player)]]
+   elseif (string.find(sensei_string, trialsDb[ent].senseiString) ~= nil) then --already defeated
+      pUnit:GossipCreateMenu(trialsDb[ent].alreadyDefeatedId, player, 0)
+      pUnit:GossipSendMenu(player)
+   elseif (player:HasFinishedQuest(trialsDb[ent].preReqQuest) or trialsDb[ent].preReqQuest == 0) then --not defeated but has finished quest/no pre req
+      local kills = player:GetUInt32Value(PLAYER_FIELD_LIFETIME_HONORBALE_KILLS)
+      if (kills >= trialsDb[ent].reqKills) then --they've got enough kills
+         pUnit:GossipCreateMenu(trialsDb[ent].readyToStartId, player, 0)
+         pUnit:GossipMenuAddItem(9, "Train me, Sensei. I wish to become stronger!", 20, 0)
+         pUnit:GossipMenuAddItem(0, "Not yet, Sensei.", 21, 0)
+         pUnit:GossipSendMenu(player)
+      else  --not enough kills
+         pUnit:GossipCreateMenu(trialsDb[ent].notEnoughKillsId, player, 0)
+         pUnit:GossipSendMenu(player)
+      end
+   else
+      pUnit:GossipCreateMenu(65535, player, 0)
+      pUnit:GossipSendMenu(player)
+   end
+end
+
+--let the rigmarole begin
+function TRIALS.OnGossipSelect(pUnit, event, player, id, intid, code)
+   if (intid == 20) then
+      player:GossipComplete()
+      pUnit:SetMovementFlags(0)
+      pUnit:SetUInt32Value(UNIT_NPC_FLAGS, 0) --UNIT_NPC_FLAGS
+      TRIALS[tostring(pUnit)] = {}
+      TRIALS[tostring(pUnit)].inTrial = false
+      TRIALS[tostring(pUnit)].pName = player:GetName()
+      TRIALS[tostring(player)] = {}
+      TRIALS[tostring(player)].versus = pUnit
+      local wp = TRIALS.findWaypoint(pUnit, "Trials - "..pUnit:GetName().." Waypoint")
+      if (pUnit:GetEntry() == YUNA_ENTRY) then --YUNA OVERRIDE: TELEPORT, NOT WALK TO WAYPOINT, AND OTHERS
+         pUnit:SetPosition(wp.x, wp.y, wp.z, wp.o)
+         local pp = TRIALS.findWaypoint(pUnit, "Trials - "..pUnit:GetName().." Player Waypoint")
+         player:Teleport(pUnit:GetMapId(), pp.x, pp.y, pp.z, pp.o)
+         for k,v in pairs(pUnit:GetInRangeObjects()) do
+            if (v:GetEntry() == YUNA_TELEROCK_ENTRY) then
+               TRIALS[tostring(player)].yunaRock = v
+               break
+            end
+         end
+      else
+         pUnit:MoveTo(wp.x, wp.y, wp.z, wp.o)
+         pUnit:SendChatMessage(12, 0, player:GetName()..", please take your place over there.")
+      end
+      local pp = TRIALS.findWaypoint(pUnit, "Trials - "..pUnit:GetName().." Player Waypoint")
+      pp.unit:SetUInt32Value(UNIT_FIELD_FLAGS, UNIT_FLAG_NOT_SELECTABLE) --UNIT_FIELD_FLAGS, UNIT_FLAG_NOT_SELECTABLE
+      pp.unit:CastSpell(6767) --Mark of Shame
+      if (pUnit:GetInRangePlayersCount() > 1) then
+         pUnit:EventChat(12, 0, "I'm also going to ask everyone else to leave. This is an individual challenge.", 3000)
+      end
+      local posTar = {wp.x, wp.y, wp.z}
+      local posNow = {pUnit:GetX(), pUnit:GetY(), pUnit:GetZ()}
+      local distance = 0
+      for i,v in ipairs(posNow) do
+         distance = distance + (v-posTar[i])^2
+      end
+      local t = math.floor(math.sqrt(distance)/2.5*1000)
+      pUnit:CreateLuaEvent(function() TRIALS.BeginTrialPart2(pUnit, player) end, t+500, 1)
+   elseif (intid == 21) then
+      player:GossipComplete()
+   elseif (intid == 22) then
+      player:SendTrainerWindow(pUnit)
+   end
+end
+
+function TRIALS.BeginTrialPart2(pUnit, player)
+   if (not CHECK(pUnit,player)) then return; end
+   local pp = TRIALS.findWaypoint(pUnit, "Trials - "..pUnit:GetName().." Player Waypoint")
+   pUnit:SetFacing(pUnit:CalcRadAngle(pUnit:GetX(), pUnit:GetY(), pp.unit:GetX(), pp.unit:GetY()))
+   pUnit:SetOrientation(pUnit:CalcRadAngle(pUnit:GetX(), pUnit:GetY(), pp.unit:GetX(), pp.unit:GetY()))
+   pUnit:SetMovementFlags(1)
+   TRIALS[tostring(pUnit)].dome = pUnit:SpawnGameObject(DOME_ENTRY, pUnit:GetX(), pUnit:GetY(), pUnit:GetZ(), pUnit:GetO(), 0, 20)
+   local wp = TRIALS.findWaypoint(pUnit, "Trials - "..pUnit:GetName().." Ptele Waypoint")
+   for k,v in pairs(pUnit:GetInRangePlayers()) do
+      if (v:GetName() ~= player:GetName()) then
+         pUnit:SendChatMessageToPlayer(15, 0, "You must leave since the trial is on. You may return when it is over.", v)
+         v:Teleport(pUnit:GetMapId(), wp.x, wp.y, wp.z, wp.o)
+      end
+   end
+   pUnit:CreateLuaEvent(function() TRIALS.expireWaiting(pUnit, player, 0) end, 20000, 1)
+   pUnit:CreateLuaEvent(function() TRIALS.checkPlayerPosition(pUnit, player) end, 100, 0)
+end
+
+function TRIALS.expireWaiting(pUnit, player, elapsed)
+   if (not CHECK(pUnit,player)) then return; end
+   if (TRIALS[tostring(pUnit)].inTrial == true or TRIALS[tostring(pUnit)].hasBowed ~= nil) then return; end
+   elapsed = elapsed + 20000
+   if (elapsed == 20000) then
+      pUnit:SendChatMessage(12, 0, "Are we fighting or what?")
+      pUnit:CreateLuaEvent(function() TRIALS.expireWaiting(pUnit, player, elapsed) end, 20000, 1)
+   elseif (elapsed == 40000) then
+      pUnit:SendChatMessage(12, 0, "I grow tired of your delays, "..player:GetName()..".")
+      pUnit:CreateLuaEvent(function() TRIALS.expireWaiting(pUnit, player, elapsed) end, 20000, 1)
+   elseif (elapsed == 60000) then
+      pUnit:SendChatMessage(12, 0, "I'm not going to waste any more time with you, "..player:GetName()..". Come back when you're truly ready.")
+      TRIALS.endTrial(pUnit, player:GetName())
+   end
+end
+
+function TRIALS.endTrial(pUnit, playerName)
+   if (DEBUG) then print("--==ENDING TRIAL==-- ("..pUnit:GetName()..", "..tostring(playerName)..")"); end
+   if (pUnit == nil) then return; end
+   pUnit:RemoveEvents()
+   pUnit:SetFaction(35)
+   pUnit:WipeThreatList(); pUnit:WipeTargetList() pUnit:SetAIState(0);
+   pUnit:Despawn(5, 5000)
+   if (GetPlayer(playerName)) then
+      GetPlayer(playerName):SetPlayerLock(false)
+   end
+   local pp = TRIALS.findWaypoint(pUnit, "Trials - "..pUnit:GetName().." Player Waypoint")
+   pp.unit:RemoveAllAuras()
+   if (TRIALS[tostring(pUnit)].dome ~= nil) then TRIALS[tostring(pUnit)].dome:Despawn(0, 0); end
+   TRIALS[tostring(pUnit)] = {}
+   TRIALS[playerName] = {}
+end
+
+function TRIALS.checkPlayerPosition(pUnit, player, ref)
+   if (not CHECK(pUnit,player)) then return; end
+   local pp = TRIALS.findWaypoint(pUnit, "Trials - "..pUnit:GetName().." Player Waypoint")
+   if (player:GetDistanceYards(pp.unit) < 2 and math.floor(pp.unit:GetZ()) == math.floor(player:GetZ())) then
+      pUnit:RemoveEvents()
+      if (pUnit:GetEntry() == REI_ENTRY) then --REI OVERRIDE: NO BOWING
+         pUnit:SendChatMessage(42, 0, "The trial is about to begin!")
+         TRIALS[tostring(pUnit)].hasBowed = true
+         player:SetPlayerLock(true)
+         player:SetFacing(pUnit:CalcRadAngle(player:GetX(), player:GetY(), pUnit:GetX(), pUnit:GetY()))
+         TRIALS[tostring(pUnit)].waitingPlayer = player
+         pp.unit:RemoveAllAuras()
+         pUnit:CreateLuaEvent(function() TRIALS.trialCountdown(pUnit, player, 4) end, 3000, 1)
+         return
+      end
+      pUnit:SendChatMessage(12, 0, "Good, you're in position. Just bow to me when you're ready to begin.")
+      player:SetPlayerLock(true)
+      player:SetFacing(pUnit:CalcRadAngle(player:GetX(), player:GetY(), pUnit:GetX(), pUnit:GetY()))
+      TRIALS[tostring(pUnit)].waitingPlayer = player
+      pUnit:Emote(2, 2000)
+      pUnit:SendChatMessage(16, 0, pUnit:GetName().." bows down, ready for the trial.")
+      pp.unit:RemoveAllAuras()
+      if (pUnit:GetEntry() == YUNA_ENTRY) then --we'll find all the waypoints now for convenience, and set Yuna run speed
+         TRIALS[tostring(pUnit)].yunaWays = {}
+         TRIALS[tostring(pUnit)].yunaCurrentWay = 1
+         pUnit:ModifyRunSpeed(12)
+         pUnit:ModifyWalkSpeed(12)
+         for i=1,8 do
+            TRIALS[tostring(pUnit)].yunaWays[i] = TRIALS.findWaypoint(pUnit, "Trials - Yuna Column Way"..i)
+         end
+      end
+   end
+end
+
+function TRIALS.OnEmote(pUnit, event, player, emoteId)
+   local t = TRIALS[tostring(pUnit)]
+   if (t.hasBowed ~= nil) then
+      return
+   elseif (t.waitingPlayer ~= nil) then
+      if ((tostring(t.waitingPlayer) == tostring(player)) and emoteId == 2) then --correct player and bowing
+         pUnit:SendChatMessage(42, 0, "The trial is about to begin!")
+         TRIALS[tostring(pUnit)].waitingPlayer = nil
+         TRIALS[tostring(pUnit)].hasBowed = true
+         pUnit:CreateLuaEvent(function() TRIALS.trialCountdown(pUnit, player, 4) end, 3000, 1)
+      end
+   end   
+end
+
+function TRIALS.trialCountdown(pUnit, player, countdown)
+   if (not CHECK(pUnit,player)) then return; end
+   if (countdown < 4 and countdown > 0) then
+      pUnit:SendChatMessage(42, 0, countdown)
+      pUnit:CreateLuaEvent(function() TRIALS.trialCountdown(pUnit, player, countdown - 1) end, 1200, 1)
+   elseif (countdown > 3) then
+      TRIALS.trialCountdown(pUnit, player, 3)
+   else
+      player:SetPlayerLock(false)
+      pUnit:SetCombatCapable(false)
+      pUnit:SetFaction(14)
+      TRIALS[tostring(pUnit)].inTrial = true
+      pUnit:AttackReaction(player, 50000, 0)
+      if (pUnit:GetEntry() == MIMI_ENTRY) then
+         TRIALS.mimi.StartFight(pUnit, player)
+      elseif (pUnit:GetEntry() == GAREN_ENTRY) then
+         TRIALS.garen.StartFight(pUnit, player)
+      elseif (pUnit:GetEntry() == YUNA_ENTRY) then
+         TRIALS.yuna.StartFight(pUnit, player)
+      elseif (pUnit:GetEntry() == REI_ENTRY) then
+         TRIALS.rei.StartFight(pUnit, player)
+      elseif (pUnit:GetEntry() == BATO_ENTRY) then
+         TRIALS.bato.StartFight(pUnit, player, "FIRST")
+      elseif (pUnit:GetEntry() == CAIN_ENTRY) then
+         TRIALS.cain.StartFight(pUnit, player)
+      end
+   end
+end
+
+function TRIALS.mimi.StartFight(pUnit, player)
+   if (not CHECK(pUnit,player)) then return; end
+   pUnit:CastSpellOnTarget(11578, player) --charge
+   pUnit:CreateLuaEvent(function() TRIALS.mimi.Phase1(pUnit, player) end, 500, 0)
+end
+
+function TRIALS.mimi.Phase1(pUnit, player)
+   if (not CHECK(pUnit,player)) then return; end
+   if (pUnit:GetHealthPct() <= 75) then
+      pUnit:RemoveEvents()
+      pUnit:CreateLuaEvent(function() TRIALS.mimi.Phase2(pUnit, player) end, 500, 0)
+      pUnit:CastSpellOnTarget(44424, player) --confuser
+      local x = player:GetX()+20
+      local y = player:GetY()+20
+      local z = pUnit:GetLandHeight(x, y)
+      pUnit:MoveTo(x, y, z, 0)
+      pUnit:CreateLuaEvent(function() TRIALS.mimi.FeatherBurst(pUnit, player) end, 4000, 1)
+   end
+end
+
+function TRIALS.mimi.Phase2(pUnit, player)
+   if (not CHECK(pUnit,player)) then return; end
+   if (pUnit:GetHealthPct() <= 25) then
+      pUnit:RemoveEvents()
+      pUnit:CastSpellOnTarget(44424, player) --confuser
+      local x = player:GetX()+20
+      local y = player:GetY()+20
+      local z = pUnit:GetLandHeight(x, y)
+      pUnit:MoveTo(x, y, z, pUnit:CalcRadAngle(x, y, player:GetX(), player:GetY()))
+      pUnit:CreateLuaEvent(function() TRIALS.mimi.FeatherBurst(pUnit, player) end, 4000, 1)
+   end
+end
+
+function TRIALS.mimi.FeatherBurst(pUnit, player)
+   if (not CHECK(pUnit,player)) then return; end
+   pUnit:SetFacing(pUnit:CalcRadAngle(pUnit:GetX(), pUnit:GetY(), player:GetX(), player:GetY()))
+   pUnit:FullCastSpellOnTarget(39068, player) --feather burst
+end
+
+function TRIALS.garen.StartFight(pUnit, player)
+   if (not CHECK(pUnit,player)) then return; end
+   pUnit:CastSpell(6960) --lightning shield 55864
+   pUnit:CreateLuaEvent(function() TRIALS.garen.Phase1(pUnit, player) end, 500, 0)
+end
+
+function TRIALS.garen.Phase1(pUnit, player)
+   if (not CHECK(pUnit, player)) then return; end
+   if (pUnit:GetHealthPct() <= 75) then
+      pUnit:RemoveEvents()
+      pUnit:CreateLuaEvent(function() TRIALS.garen.Phase2(pUnit, player) end, 500, 0)
+      pUnit:CastSpellOnTarget(55864, player) --thunderblade
+      pUnit:CastSpell(35492) --exhaustion
+      pUnit:SendChatMessage(12, 0, "Whew! I'm not as young as I used ta be...")
+   end
+end
+
+function TRIALS.garen.Phase2(pUnit, player)
+   if (not CHECK(pUnit,player)) then return; end
+   if (pUnit:GetHealthPct() <= 25) then
+      pUnit:RemoveEvents()
+      pUnit:CastSpellOnTarget(7803, player) --thundershock
+      pUnit:CastSpell(24225) --exhaustion
+      pUnit:SendChatMessage(12, 0, "Ugh - there goes my back...")
+   end
+end
+
+function TRIALS.yuna.StartFight(pUnit, player)
+   if (not CHECK(pUnit,player)) then return; end
+   pUnit:SetCombatCapable(true)
+   pUnit:SetAIState(10)
+   TRIALS[tostring(pUnit)].yunaWaysPast = 0
+   TRIALS[tostring(pUnit)].yunaTelesDone = 0
+   TRIALS[tostring(pUnit)].yunaElapsed = 0
+   pUnit:CreateLuaEvent(function() TRIALS.yuna.RunAround(pUnit, player) end, 100, 0)
+end
+
+function TRIALS.yuna.RunAround(pUnit, player)
+   if (not CHECK(pUnit,player)) then return; end
+   --check position
+   if (player:GetZ() < (TRIALS.yuna.GetClosestWay(pUnit).z - TRIALS[tostring(player)].yunaRock:GetZ()) / 2) then
+      TRIALS.yuna.ExpireWaiting(pUnit, player)
+      return
+   end
+   local cur = TRIALS[tostring(pUnit)].yunaCurrentWay
+   local next
+   if (cur == 8) then 
+      next = TRIALS[tostring(pUnit)].yunaWays[1]
+   else
+      next = TRIALS[tostring(pUnit)].yunaWays[cur+1]
+   end
+   if (pUnit:GetDistanceYards(next.unit) <= 1) then
+      if (cur == 8) then
+         TRIALS[tostring(pUnit)].yunaCurrentWay = 1
+      else
+         TRIALS[tostring(pUnit)].yunaCurrentWay = cur+1
+      end
+      TRIALS[tostring(pUnit)].yunaWaysPast = TRIALS[tostring(pUnit)].yunaWaysPast+1
+      if (TRIALS[tostring(pUnit)].yunaCurrentWay == 8) then 
+         next = TRIALS[tostring(pUnit)].yunaWays[1]
+      else
+         next = TRIALS[tostring(pUnit)].yunaWays[TRIALS[tostring(pUnit)].yunaCurrentWay+1]
+      end
+   end
+   pUnit:MoveTo(next.x, next.y, next.z, next.o)
+   if (TRIALS[tostring(pUnit)].yunaWaysPast == 4) then
+      TRIALS[tostring(pUnit)].yunaWaysPast = 0
+      pUnit:RemoveEvents()
+      TRIALS.yuna.TeleRandomWay(pUnit, player)
+   end
+end
+
+function TRIALS.yuna.ExpireWaiting(pUnit, player)
+   if (not CHECK(pUnit,player)) then return; end
+   TRIALS[tostring(pUnit)].yunaElapsed = TRIALS[tostring(pUnit)].yunaElapsed+100
+   if (TRIALS[tostring(pUnit)].yunaElapsed == 100) then
+      pUnit:SendChatMessage(14, 0, "Oh, come on "..player:GetName().."! Use the teleport stone again and return to the fight!")
+   elseif (TRIALS[tostring(pUnit)].yunaElapsed == 10000) then
+      pUnit:SendChatMessage(14, 0, "Your cowardice sickens me, "..player:GetName()..". Get up now or forfeit.")
+   elseif (TRIALS[tostring(pUnit)].yunaElapsed == 20000) then
+      pUnit:SendChatMessage(14, 0, "That's it. You're obviously not ready for this, "..player:GetName()..". Come back when you are.")
+      TRIALS.endTrial(pUnit, TRIALS[tostring(pUnit)].pName)
+      return
+   end
+end
+
+function TRIALS.yuna.TeleRandomWay(pUnit, player)
+   if (not CHECK(pUnit,player)) then return; end
+   local way = math.random(1, 8)
+   TRIALS[tostring(pUnit)].yunaCurrentWay = way
+   local t_way = TRIALS[tostring(pUnit)].yunaWays[way]
+   pUnit:SetPosition(t_way.x, t_way.y, t_way.z, t_way.o)
+   TRIALS[tostring(pUnit)].yunaTelesDone = TRIALS[tostring(pUnit)].yunaTelesDone+1
+   if (TRIALS[tostring(pUnit)].yunaTelesDone < 3) then
+      pUnit:CreateLuaEvent(function() TRIALS.yuna.RunAround(pUnit, player) end, 100, 0)
+   else
+      TRIALS[tostring(pUnit)].yunaTelesDone = 0
+      TRIALS.yuna.StartDeathCombo(pUnit, player)
+   end
+end
+
+function TRIALS.yuna.StartDeathCombo(pUnit, player)
+   if (not CHECK(pUnit,player)) then return; end
+   pUnit:CastSpellOnTarget(52327, player) --shadowstep
+   pUnit:CastSpellOnTarget(15283, player) --stun
+   pUnit:CreateLuaEvent(function() TRIALS.yuna.DeathCombo(pUnit, player) end, 2000, 1)
+end
+
+function TRIALS.yuna.DeathCombo(pUnit, player)
+   if (not CHECK(pUnit,player)) then return; end
+   local way = TRIALS.yuna.GetClosestWay(player)
+   local wayInt = way.int+4
+   if (wayInt > 8) then
+      wayInt = wayInt-8
+   end
+   local teleWay = TRIALS[tostring(pUnit)].yunaWays[wayInt]
+   pUnit:SetPosition(teleWay.x, teleWay.y, teleWay.z, teleWay.o)
+   pUnit:FullCastSpell(66134) --shadow strike
+   pUnit:SendChatMessage(42, 0, "Yuna begins to cast the Shadow Strike!")
+   local r = math.random(1,5)
+   if (r ~= 5) then --taking their location 1 second before and tele'ing there.
+      pUnit:CreateLuaEvent(function() TRIALS.yuna.Take1SecondReading(pUnit, player) end, 6500, 1)
+   else --picking a random one and hoping player there
+      local rand = TRIALS.findWaypoint(pUnit, "Trials - Yuna Column Way"..(math.random(1,8)))
+      pUnit:CreateLuaEvent(function() TRIALS.yuna.PerformStrike(pUnit, player, rand.x, rand.y, rand.z) end, 7000, 1)
+   end
+end
+
+function TRIALS.yuna.Take1SecondReading(pUnit, player)
+   if (not CHECK(pUnit,player)) then return; end
+   local x = player:GetX()
+   local y = player:GetY()
+   local z = player:GetZ()
+   pUnit:CreateLuaEvent(function() TRIALS.yuna.PerformStrike(pUnit, player, x, y, z) end, 1000, 1)
+end
+
+function TRIALS.yuna.PerformStrike(pUnit, player, x, y, z)
+   if (not CHECK(pUnit,player)) then return; end
+   local v = TRIALS.yuna.GetClosestWay(pUnit).unit
+   pUnit:CastSpellOnTarget(66134, v); v:SetDeathState(0); v:SetHealthPct(100); --bunny sacrifice!
+   pUnit:SetPosition(x, y, z, pUnit:CalcRadAngle(x, y, player:GetX(), player:GetY()))
+   if (pUnit:GetDistanceYards(player) <= 5) then --haha, gotcha!
+      local damagePct = player:GetHealthPct()-7
+      local damageAmt = 0
+      if (damagePct > 0) then damageAmt = (damagePct / 100 * player:GetMaxHealth()); end
+      pUnit:DealDamage(player, damageAmt, 45271)
+      pUnit:PlaySpellVisual(pUnit:GetGUID(), 0x54) --"special attack" emote
+   else --aww they got away
+      pUnit:CastSpell(30457) --complete vulnerability
+      pUnit:EventCastSpell(pUnit, 15283, 1000, 1) --stun self, 8 seconds
+      pUnit:SendChatMessage(42, 0, "Yuna is completely vulnerable!")
+      pUnit:PlaySpellVisual(pUnit:GetGUID(), 0x54) --"special attack" emote
+   end
+   pUnit:CreateLuaEvent(function() TRIALS.yuna.Recover(pUnit, player) end, 8000, 1)
+end
+
+function TRIALS.yuna.Recover(pUnit, player)
+   if (not CHECK(pUnit,player)) then return; end
+   local near = TRIALS.yuna.GetClosestWay(pUnit)
+   pUnit:SetPosition(near.x, near.y, near.z, near.o)
+   TRIALS[tostring(pUnit)].yunaCurrentWay = near.int
+   pUnit:CreateLuaEvent(function() TRIALS.yuna.RunAround(pUnit, player) end, 100, 0)
+end
+
+function TRIALS.rei.StartFight(pUnit, player, init)
+   if (not CHECK(pUnit,player)) then return; end
+   pUnit:CastSpell(24222) --vanish vish
+   pUnit:CastSpell(46076) --invis
+   if (init == nil) then
+      player:Root()
+      player:Unroot() --they def should not be moving initially now.
+      pUnit:SendChatMessage(12, 0, "Now let's play a little hide-and-seek!")
+      init = 0
+   end
+   pUnit:SetUInt32Value(UNIT_FIELD_FLAGS, UNIT_FLAG_NOT_ATTACKABLE_2) --UNIT_FIELD_FLAGS, UNIT_FLAG_NOT_ATTACKABLE_2
+   pUnit:SetCombatMeleeCapable(1) 
+   pUnit:CreateLuaEvent(function() TRIALS.rei.CheckMovement(pUnit, player) end, 300, 0)
+   pUnit:CreateLuaEvent(function() TRIALS.rei.WanderExpire1(pUnit, player) end, 9000 + init*2000, 1)
+   TRIALS.rei.Wander(pUnit, player)
+end
+
+function TRIALS.rei.CheckMovement(pUnit, player)
+   if (not CHECK(pUnit,player)) then return; end
+   if (player:IsPlayerMoving() == true and bit_and(player:GetPlayerMovementFlags(), 256) == 0) then
+      pUnit:CastSpellOnTarget(5726, player) --stunning blow
+      pUnit:RemoveEvents()
+      local x = player:GetX()+math.cos(-player:GetO()+math.pi) * 5
+      local y = player:GetY()-math.sin(-player:GetO()+math.pi) * 5
+      local z = player:GetZ()
+      pUnit:SetPosition(x, y, z, player:GetO())
+      pUnit:RemoveAllAuras()
+      pUnit:CastSpellOnTarget(39669, player) --ambush
+      pUnit:SendChatMessage(12, 0, "Fool! I don't have eyes, but I have ears!")
+      player:Root()
+      player:Unroot() --they def should not be moving now.
+      pUnit:CreateLuaEvent(function() TRIALS.rei.StartFight(pUnit, player, 1) end, 3000, 1)
+   end
+end
+
+function TRIALS.rei.WanderExpire1(pUnit, player)
+   if (not CHECK(pUnit,player)) then return; end
+   pUnit:RemoveEvents()
+   pUnit:SendChatMessage(12, 0, "Are you...")
+   pUnit:CreateLuaEvent(function() TRIALS.rei.WanderExpire2(pUnit,player) end, 1000, 1)
+end
+
+function TRIALS.rei.WanderExpire2(pUnit, player)
+   if (not CHECK(pUnit,player)) then return; end
+   local int = math.random(6)
+   local way = TRIALS.findWaypoint(pUnit, "Trials - Rei Attack Way"..int)
+   pUnit:CastSpell(24222) --vanish vish
+   pUnit:SetPosition(way.x, way.y, way.z, way.o)
+   pUnit:RemoveAllAuras()
+   pUnit:SendChatMessage(12, 0, "HERE?")
+   pUnit:SetUInt32Value(UNIT_FIELD_FLAGS, 0) --UNIT_FIELD_FLAGS, none
+   if (pUnit:GetDistanceYards(player) <= 3) then
+      pUnit:CastSpellOnTarget(5726, player) --stun
+      pUnit:CastSpellOnTarget(39669, player) --ambush
+      pUnit:CreateLuaEvent(function() TRIALS.rei.StartFight(pUnit, player, 1) end, 2100, 1)
+   else
+      pUnit:CastSpell(42903) --attack visual
+      pUnit:EventCastSpell(pUnit, 24647, 1000, 1) --self stun
+      pUnit:StopMovement(3)
+      pUnit:CreateLuaEvent(function() TRIALS.rei.StartFight(pUnit, player, 1) end, 3100, 1)
+   end
+end
+
+function TRIALS.rei.Wander(pUnit, player)
+   if (not CHECK(pUnit,player)) then return; end
+   pUnit:SetAIState(10)
+   local xt = pUnit:GetX()+math.random(-10,10)
+   local yt = pUnit:GetY()+math.random(-10,10)
+   local zt = pUnit:GetLandHeight(xt,yt)
+   local ot = pUnit:CalcRadAngle(pUnit:GetX(), pUnit:GetY(), xt, yt)
+   local src = {pUnit:GetX(), pUnit:GetY(), pUnit:GetZ()}
+   local tar = {xt, yt, zt}
+   local distance = 0
+   for i,v in ipairs(src) do
+      distance = distance + (v-tar[i])^2
+   end
+   pUnit:MoveTo(xt, yt, zt, ot)
+   local t = math.floor(math.sqrt(distance)/2.5*1000)
+   pUnit:CreateLuaEvent(function() TRIALS.rei.Wander(pUnit, player) end, t+math.random(1000), 1)
+end
+
+function TRIALS.bato.StartFight(pUnit, player, first)
+   pUnit:RemoveEvents()
+   pUnit:Root()
+   pUnit:SetCombatMeleeCapable(true)
+   TRIALS[tostring(pUnit)].waitingDamage = player
+   pUnit:CreateLuaEvent(function() TRIALS.bato.StopWaiting(pUnit, player, first) end, 6000, 1)
+end
+
+function TRIALS.bato.StopWaiting(pUnit, player, first)
+   if (not CHECK(pUnit,player)) then return; end
+   TRIALS[tostring(pUnit)].waitingDamage = nil
+   if (first == "FIRST") then 
+      pUnit:SendChatMessage(12, 0, "Very well then, permit me to have the first strike!")
+   end
+   pUnit:Unroot()
+   pUnit:SetCombatMeleeCapable(false)
+   pUnit:CastSpellOnTarget(43651, player) --charge
+   if (first ~= "NO BASH") then
+      pUnit:EventCastSpell(player, 43612, 1000, 1) --bash
+   end
+   pUnit:CreateLuaEvent(function() TRIALS.bato.StartFight(pUnit, player) end, 7000, 1)
+end
+
+function TRIALS.bato.OnTakenDamage(pUnit, event, pMisc)
+   if (tostring(TRIALS[tostring(pUnit)].waitingDamage) == tostring(pMisc)) then
+      pUnit:RemoveEvents()
+      pUnit:Unroot()
+      pUnit:SetCombatMeleeCapable(false)
+      pUnit:EventChat(12, 0, "YES! My rage burns ever stronger!", 1000)
+      pUnit:CreateLuaEvent(function() TRIALS.bato.Whirlwind(pUnit, TRIALS[tostring(pUnit)].waitingDamage) end, 1000, 1)
+      TRIALS[tostring(pUnit)].waitingDamage = nil
+   end
+end
+
+function TRIALS.bato.Whirlwind(pUnit, player)
+   if (not CHECK(pUnit,player)) then return; end
+   pUnit:CastSpell(50228) --whirlwind
+   TRIALS.bato.MoveToPlayerPulse(pUnit, player)
+   pUnit:CreateLuaEvent(function() TRIALS.bato.MoveToPlayerPulse(pUnit, player) end, 500, 20)
+   pUnit:CreateLuaEvent(function() TRIALS.bato.Dizzy(pUnit, player) end, 10000, 1)
+end
+
+function TRIALS.bato.MoveToPlayerPulse(pUnit, player)
+   if (not CHECK(pUnit,player)) then return; end
+   pUnit:MoveTo(player:GetX(), player:GetY(), player:GetZ(), player:GetO())
+end
+
+function TRIALS.bato.Dizzy(pUnit, player)
+   if (not CHECK(pUnit,player)) then return; end
+   pUnit:CastSpell(9992) --dizzy, 10s
+   pUnit:CreateLuaEvent(function() TRIALS.bato.StopWaiting(pUnit, player, "NO BASH") end, 10000, 1)
+end
+
+function TRIALS.cain.StartFight(pUnit, player)
+   pUnit:CastSpell(16492) --blood craze
+   pUnit:CastSpell(31997) --bloodthirst
+   pUnit:CreateLuaEvent(function() TRIALS.cain.PeriodicBuff(pUnit, player, 31997) end, 15000, 0) --bloodthirst
+   pUnit:CreateLuaEvent(function() TRIALS.cain.BloodDrain(pUnit, player, false) end, 10000, 0)
+   pUnit:CreateLuaEvent(function() TRIALS.cain.ThirtyPercentEvent(pUnit, player) end, 1000, 0)
+end
+
+function TRIALS.cain.PeriodicBuff(pUnit, player, spell)
+   if (not CHECK(pUnit,player)) then return; end
+   pUnit:CastSpell(spell)
+end
+
+function TRIALS.cain.BloodDrain(pUnit, player, dbl)
+   if (not CHECK(pUnit,player)) then return; end
+   if (dbl) then
+      pUnit:CastSpellOnTarget(6958, player) --10 hp drain
+   else
+      pUnit:CastSpellOnTarget(11898, player) --20 hp drain
+   end
+end
+
+function TRIALS.cain.ThirtyPercentEvent(pUnit, player)
+   if (not CHECK(pUnit,player,TRIALS[tostring(pUnit)].inTrial)) then return; end
+   if (pUnit:GetHealthPct() <= 30) then
+      player:CastSpell(6945) --chest pains
+      pUnit:EventCastSpell(pUnit, 41231, 4000, 1) --prophecy of blood
+      pUnit:FullCastSpell(36476) --blood heal
+      pUnit:RemoveEvents()
+      pUnit:CreateLuaEvent(function() TRIALS.cain.BloodDrain(pUnit, player, true) end, 10000, 0)
+      --RegisterTimedEvent("TRIALS.cain.PeriodicBuff", 3000, 0, pUnit, player, 42705) --enrage
+   end
+end
+
+function TRIALS.checkHealths(event, killer, victim)
+   local pUnit, player
+   if (killer:IsCreature()) then pUnit = killer; player = victim; end
+   if (killer:IsPlayer()) then pUnit = victim; player = killer; end
+   if (trialsDb[pUnit:GetEntry()] == nil) then return 1; end
+   if (TRIALS[tostring(pUnit)].inTrial == false) then return 0; end
+   pUnit:RemoveEvents()
+   if (pUnit == victim) then --player wins
+      pUnit:SetHealth(1)
+      pUnit:RemoveAllAuras()
+      player:RemoveNegativeAuras()
+      pUnit:SetCombatCapable(true)
+      pUnit:SetFaction(35)
+      pUnit:SetUInt32Value(UNIT_FIELD_FLAGS, UNIT_FLAG_NOT_SELECTABLE) --UNIT_FIELD_FLAGS, UNIT_FLAG_NOT_SELECTABLE
+      if (pUnit:GetEntry() % 2 == 0) then
+         player:FullCastSpell(52852) --"Victory" spell
+      else
+         player:FullCastSpell(52994) --"Duel Victory" spell
+      end
+      pUnit:Root()
+      TRIALS[tostring(pUnit)].inTrial = false
+      pUnit:Emote(20, 3500) --EMOTE_ONESHOT_BEG
+      pUnit:SendChatMessage(12, 0, "Gah, I am defeated! You have done well.") --def needs changing
+      pUnit:EventChat(12, 0, "Now, move on. A long road remains ahead.", 3000) --def needs changing
+      local ss = trialsDb[pUnit:GetEntry()].senseiString
+      CharDBQuery("UPDATE ronin SET senseis_defeated = CONCAT(senseis_defeated, '"..ss.."') WHERE name = '"..player:GetName().."'")
+      pUnit:CreateLuaEvent(function() TRIALS.endTrial(pUnit, player:GetName()) end, 6000, 1)
+   elseif (pUnit == killer) then --pUnit wins
+      player:SetHealth(1)
+      pUnit:RemoveAllAuras()
+      player:RemoveNegativeAuras()
+      pUnit:SetCombatCapable(true)
+      pUnit:SetFaction(35)
+      pUnit:SetUInt32Value(UNIT_FIELD_FLAGS, UNIT_FLAG_NOT_SELECTABLE) --UNIT_FIELD_FLAGS, UNIT_FLAG_NOT_SELECTABLE
+      player:Emote(20, 3500) --EMOTE_ONESHOT_BEG
+      TRIALS[tostring(pUnit)].inTrial = false
+      pUnit:SendChatMessage(12, 0, "Well, "..player:GetName()..", it looks like you're just not strong enough.") --def needs changing
+      pUnit:EventChat(12, 0, "Feel free to speak to me when you feel ready to try again.", 3000) --def needs changing
+      pUnit:CreateLuaEvent(function() TRIALS.endTrial(pUnit, player:GetName()) end, 6000, 1)
+   end
+   return 0
+end
+
+function TRIALS.yuna.RockOnUse(pGo, event, player)
+   if (TRIALS[tostring(player)] == nil) then return; end
+   if (tostring(TRIALS[tostring(player)].yunaRock) == tostring(pGo)) then
+      local wp = TRIALS.findWaypoint(player, "Trials - Yuna Shikan Player Waypoint")
+      player:Teleport(player:GetMapId(), wp.x, wp.y, wp.z, wp.o)
+   end
+end
+
+function TRIALS.playerLogout(event, player)
+   if (type(TRIALS[tostring(player)]) == "table") then
+      if (TRIALS[tostring(player)].versus and TRIALS[tostring(player)].versus:IsInWorld()) then
+         TRIALS.endTrial(TRIALS[tostring(player)].versus, player:GetName())
+      end
+   end
+end
+
+for k,v in pairs(trialsDb) do
+   RegisterUnitEvent(k, 18, TRIALS.OnSpawn)
+   RegisterUnitGossipEvent(k, 1, TRIALS.OnGossipTalk)
+   RegisterUnitGossipEvent(k, 2, TRIALS.OnGossipSelect)
+   RegisterUnitEvent(k, 22, TRIALS.OnEmote)
+end
+RegisterGameObjectEvent(YUNA_TELEROCK_ENTRY, 4, TRIALS.yuna.RockOnUse)
+RegisterUnitEvent(BATO_ENTRY, 23, TRIALS.bato.OnTakenDamage)
+RegisterServerHook(28, TRIALS.checkHealths)
+RegisterServerHook(13, TRIALS.playerLogout)

@@ -1,0 +1,10 @@
+function LandHeight_OnChat(event, plr, message, type, language)
+    if (message == "#landheight") then
+        local height = plr:GetLandHeight(plr:GetX(),plr:GetY())
+        plr:SendAreaTriggerMessage("Land height is: "..height)
+        plr:SendBroadcastMessage("Land height is: "..height)
+        print("Land height is: "..height)
+    end
+end
+
+RegisterServerHook(16, "LandHeight_OnChat")

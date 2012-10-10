@@ -1,0 +1,75 @@
+-----------------------
+--Made by Hypersniper--
+-----Project Ronin-----
+-----------------------
+
+local mod = getfenv(1)
+assert(type(mod) == "table", "RONIN_DUNGEON: Critical error, parent module missing!")
+module(mod._NAME..".VURK", package.seeall)
+local self = getfenv(1)
+
+local entry = 15
+local door_entry = 204
+
+local Boulder = 19701
+local Rock_Rumble = 38777
+local Earth_Rumble = 33840
+local Ground_Tremor = 6524
+local Minor_Tremor = 10455
+local Bone_Breaker = 43108
+local Crush = 50234
+local Brittle_Skin = 62055
+
+function OnCombat(pUnit, e, pTarget)
+   pUnit:SendChatMessage(14, 0, "In...tru...der!")
+   pUnit:FullCastSpellOnTarget(Boulder, pTarget)
+   pUnit:RegisterEvent(TwentyPctEvents, 1000, 0)
+   local sUnit = tostring(pUnit)
+   self[sUnit] = {}
+end
+
+function OnSpawn(pUnit)
+   pUnit:RegisterEvent(OnSpawnLater, 200, 1) --in range set update grr
+end
+
+function OnSpawnLater(pUnit)
+   local go = pUnit:GetGameObjectNearestCoords(pUnit:GetX(), pUnit:GetY(), pUnit:GetZ(), door_entry)
+   go:SetUInt32Value(9, 0x1)
+end
+
+function TwentyPctEvents(pUnit)
+   local sUnit = tostring(pUnit)
+   for i=80,20,-20 do
+      if (pUnit:GetHealthPct() <= i and self[sUnit]["_"..i] == nil) then
+         self[sUnit]["_"..i] = true
+         if (i == 80) then
+            pUnit:CastSpell(Bone_Breaker)
+            pUnit:SendChatMessage(12, 0, "You...")
+         elseif (i == 60) then
+            pUnit:CastSpell(Ground_Tremor)
+            pUnit:SendChatMessage(12, 0, "...Are not...")
+         elseif (i == 40) then
+            pUnit:CastSpell(Minor_Tremor)
+            pUnit:SendChatMessage(12, 0, "...Allowed...")
+         elseif (i == 20) then
+            pUnit:CastSpellOnTarget(Crush, pUnit:GetMainTank())
+            pUnit:SendChatMessage(12, 0, "...To be...")
+         end
+         pUnit:CastSpell(Brittle_Skin)
+      end
+   end
+end
+
+function OnReset(pUnit, event) --death/leave combat
+   if (event == 4) then
+      pUnit:SendChatMessage(12, 0, "...Here...")
+      local go = pUnit:GetGameObjectNearestCoords(pUnit:GetX(), pUnit:GetY(), pUnit:GetZ(), door_entry)
+      go:SetUInt32Value(9, 0x0)
+   end
+   pUnit:RemoveEvents()
+end
+
+RegisterUnitEvent(entry, 1, OnCombat)
+RegisterUnitEvent(entry, 2, OnReset)
+RegisterUnitEvent(entry, 4, OnReset)
+RegisterUnitEvent(entry, 18, OnSpawn)

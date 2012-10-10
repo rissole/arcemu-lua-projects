@@ -1,0 +1,172 @@
+-----------------------
+--Made by Hypersniper--
+-----Project Ronin-----
+-----------------------
+
+--Module loader
+function table.find(t, v)
+    if type(t) == "table" and v then
+        for k, val in pairs(t) do
+            if v == val then
+                return k
+            end
+        end
+    end
+    return false
+end
+
+module("ORCHESTRA", package.seeall)
+local mod = getfenv(1)
+print("Orchestra Dungeon Loader:")
+
+--SHARED VARS
+MAXEVENT = 0
+function GetCreatureSpawn(pUnit, id)
+   for k,v in pairs(pUnit:GetInRangeUnits()) do
+      if (v:GetSpawnId() == id) then
+         return v
+      end
+   end
+   return nil
+end
+function GetObjectSpawn(pUnit, id)
+   for k,v in pairs(pUnit:GetInRangeObjects()) do
+      if (v:GetSpawnId() == id) then
+         return v
+      end
+   end
+   return nil
+end
+function FaceUnit(u, p)
+   if (not u or not p) then return; end
+   u:SetFacing(u:CalcRadAngle(u:GetX(), u:GetY(), p:GetX(), p:GetY()))
+end
+function EmoteEventChat(pUnit, t, l, m, d, e, t2)
+   e = e or 1
+   t2 = t2 or 2000
+   pUnit:RegisterEvent(function() pUnit:Emote(e, t2) end, d, 1)
+   pUnit:EventChat(t, l, m, d)
+end
+function HyperActivate(pGo, bOpen)
+   if (bOpen) then bOpen = 0; else bOpen = 1; end
+   pGo:SetByte(GAMEOBJECT_BYTES_1, 0, bOpen)
+end
+function GetAllWithEntries(pUnit, ...)
+   local ret = {}
+   for k,v in pairs(pUnit:GetInRangeUnits()) do
+      if (table.find(arg, v:GetEntry())) then
+         table.insert(ret, v)
+      end
+   end
+   if (table.find(arg, pUnit:GetEntry())) then
+      table.insert(ret, pUnit)
+   end
+   return ret
+end
+function AreAllDead(tUnits)
+   for k,v in pairs(tUnits) do
+      if (not v:IsDead()) then return false; end
+   end
+   return true
+end
+function CloseAllPreviousDoors(id, ...)
+   if (type(arg[1]) == "number") then
+      local maxevent = arg[1]
+      for i=1,maxevent do
+         HyperActivate(mod["EVENT"..i][id].p1, false)
+         HyperActivate(mod["EVENT"..i][id].p2, false)
+      end
+   else
+      for i=1,MAXEVENT do
+         if (mod["EVENT"..i][id].status == 2) then
+            HyperActivate(mod["EVENT"..i][id].p1, false)
+            HyperActivate(mod["EVENT"..i][id].p2, false)
+         elseif (mod["EVENT"..i][id].status ~= 2 and mod["EVENT"..i][id].status ~= nil) then
+            HyperActivate(mod["EVENT"..i][id].p1, false)
+         end
+      end
+   end
+end
+function OpenAllPreviousDoors(id, ...)
+   if (type(arg[1]) == "number") then
+      local maxevent = arg[1]
+      for i=1,maxevent do
+         HyperActivate(mod["EVENT"..i][id].p1, true)
+         if (i ~= maxevent) then
+            HyperActivate(mod["EVENT"..i][id].p2, true)
+         end
+      end
+   else
+      local final = nil
+      for i=1,MAXEVENT do
+         if (mod["EVENT"..i][id].status == 2) then
+            HyperActivate(mod["EVENT"..i][id].p1, true)
+            HyperActivate(mod["EVENT"..i][id].p2, true)
+            final = i
+         elseif (mod["EVENT"..i][id].status ~= 2 and mod["EVENT"..i][id].status ~= nil) then
+            HyperActivate(mod["EVENT"..i][id].p1, true)
+         end    
+      end
+      if (final ~= nil) then HyperActivate(mod["EVENT"..final][id].p2, false) end
+   end
+end
+function RefineUnitsToArea(tUnits, x1, x2, y1, y2, z1, z2)
+   local ret = {}
+   if (type(x1) == "table") then
+      x1, x2, y1, y2, z1, z2 = unpack(x1)
+   end
+   for k,v in pairs(tUnits) do
+      local x, y, z = v:GetLocation()
+      if (x >= math.min(x1,x2) and x <= math.max(x1,x2) and y >= math.min(y1,y2) and y <= math.max(y1,y2) and 
+         z >= math.min(z1,z2) and z <= math.max(z1,z2)) then
+         table.insert(ret, v)
+      end
+   end
+   return ret
+end
+function GetLivePlayersInInstance(map, iid)
+   local tUnits = GetPlayersInInstance(pUnit:GetMapId(), pUnit:GetInstanceID())
+   local ret = {}
+   for k,v in pairs(tUnits) do
+      if (v:IsAlive() and v:IsInWorld()) then
+         table.insert(ret, v)
+      end
+   end
+   return ret
+end
+--END SHARED
+
+local directory = "scripts/ORCHESTRA/"
+local modules = { "opening.script", "event1.script", "event2.script" }
+for _,v in pairs(modules) do
+   local loader_function, errormsg = loadfile(directory..v)
+   if (loader_function == nil) then
+      print(errormsg)
+   else
+      setfenv(loader_function, mod)
+      local ret, errormsg = pcall(loader_function)
+      if (ret == false) then
+         print(errormsg)
+      else
+         print(string.format("Successfully loaded script file: \"%s\"", v))
+         if (v:find("event") ~= nil) then
+            MAXEVENT = MAXEVENT + 1
+         end
+      end
+   end
+end
+
+local function SetupInst(id)
+   mod.OPENING[id] = {}
+   mod.EVENT1[id] = {}
+   mod.EVENT2[id] = {}
+end
+
+local function DestroyInst(id)
+   mod.OPENING[id] = nil
+   mod.EVENT1[id] = nil
+   mod.EVENT2[id] = nil
+end
+
+RegisterInstanceEvent(33, 9, SetupInst)
+RegisterInstanceEvent(33, 10, DestroyInst)

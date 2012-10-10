@@ -1,0 +1,58 @@
+-----------------------
+--Made by Hypersniper--
+-----Project Ronin-----
+-----------------------
+
+local nArcher = 0
+local nTarget = 74772
+
+math.randomseed(os.time())
+
+local function GetRandomTarget(pUnit)
+   local ret = {}
+   for k,v in pairs(pUnit:GetInRangeUnits()) do
+      if (v:GetEntry() == nTarget) then
+         table.insert(ret, v)
+      end
+   end
+   return ret[math.random(1, #ret)]
+end
+
+local function Archer_ShootRandomTarget(pUnit)
+   local tar = GetRandomTarget(pUnit)
+   if (not tar) then return; end
+   pUnit:CastSpellOnTarget(3018, tar) --shoot
+end
+
+local function Archer_Spawn(pUnit)
+   pUnit:RegisterEvent(Archer_ShootRandomTarget, math.random(20000, 50000), 0)
+end
+
+local function OnCastSpell(event, player, id, spell)
+   local bIsRanged = (bit_and(GetDBCSpellVar(id, "AttributesExC"),0x8000) > 0 or id == 2764)
+   local t = spell:GetTarget()
+   if (t ~= nil and t:GetObjectType() == "Unit" and t:GetEntry() == nTarget) then --targeting an Archery Target
+      if (not bIsRanged) then --non-ranged spell:
+         player:SendAreaTriggerMessage("|cFFFF0000You can't do that to the Archery Target.|r")
+         return 0
+      end
+   end
+end
+
+local function OnUnitDie(event, pUnitX, pUnit)
+   if (pUnit:GetEntry() == nTarget) then
+      pUnit:SetHealth(pUnit:GetMaxHealth())
+      return 0
+   end
+end
+
+local function SetupTarget(pUnit)
+   pUnit:Root()
+   pUnit:SetCombatCapable(true)
+   --pUnit:DisablePlayerMelee(true) --custom, players can't melee me now.
+end
+
+RegisterUnitEvent(nArcher, 18, Archer_Spawn)
+RegisterUnitEvent(nTarget, 18, SetupTarget)
+RegisterServerHook(10, OnCastSpell)
+RegisterServerHook(28, OnUnitDie)

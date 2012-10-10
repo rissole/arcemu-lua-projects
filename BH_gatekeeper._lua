@@ -1,0 +1,77 @@
+-----------------------
+--Made by Hypersniper--
+-------wow-v.com-------
+--For Burning Heavens--
+-----------------------
+
+GATEKEEPER = {}
+GATEKEEPER.entry = 10000
+GATEKEEPER.villagerEntry = 10001
+
+--I'm assuming this is a game object.
+GATEKEEPER.portalEntry = 500
+
+--Coords for the villagers to spawn at. x,y,z,o.
+--every 10s he will spawn villagers at three of these locations.
+GATEKEEPER.Coords = {
+{1000, 1000, 0, 0},
+{1050, 1050, 0, 0},
+{1100, 1100, 0, 0}
+}
+
+function GATEKEEPER.OnCombat(pUnit, event, mTarget)
+   pUnit:SendChatMessage(14, 0, "None shall pass!")
+   pUnit:RegisterEvent("GATEKEEPER.Cleave", 5000, 0)
+   pUnit:RegisterEvent("GATEKEEPER.SBV", 15000, 0)
+   pUnit:RegisterEvent("GATEKEEPER:SpawnVillagers", 20000, 0)
+end
+
+function GATEKEEPER.removeEvents(pUnit, event)
+   pUnit:RemoveEvents()
+   for k,v in pairs(pUnit:GetInRangeUnits()) do
+      if (v:GetEntry() == GATEKEEPER.villagerEntry) then
+         v:Despawn(1000, 0)
+      end
+   end
+   if (event == 4) then
+      pUnit:SendChatMessage(12, 0, "I... did all... I could...")
+      local g = pUnit:GetGameObjectNearestCoords(pUnit:GetX(), pUnit:GetY(), pUnit:GetZ(), GATEKEEPER.portalEntry)
+      if (not g) then return; end
+      g:Despawn(0, 0)
+      for k,v in pairs(pUnit:GetInRangeUnits()) do
+         if (v:GetName() == "Demonic Presence") then
+            v:EventChat(14, 0, "OUTRAGEOUS! This treachery will not be forgotten!", 3000)
+            break
+         end
+      end
+   end
+end
+
+function GATEKEEPER.Cleave(pUnit)
+   if (not pUnit:GetMainTank()) then return; end
+   pUnit:CastSpellOnTarget(68868, pUnit:GetMainTank()) --cleave
+end
+
+function GATEKEEPER.SBV(pUnit)
+   pUnit:FullCastSpell(70184) --shadow bolt volley
+end
+
+function GATEKEEPER:SpawnVillagers(pUnit)
+   local p = pUnit:GetRandomPlayer(0)
+   if ( not(p and p:IsInWorld() and p:IsAlive()) ) then
+      pUnit:RegisterEvent("GATEKEEPER:SpawnVillagers", 100, 1)
+      return
+   end
+   for i=1,3 do
+      local r = math.random(#(self.Coords))
+      local s = pUnit:SpawnCreature(self.villagerEntry, self.Coords[r][1], self.Coords[r][2], self.Coords[r][3], self.Coords[r][4], pUnit:GetFaction(), 0)
+      s:AttackReaction(p, 1000, 0)
+   end
+   if (math.random(10) <= 5) then
+      pUnit:SendChatMessage(14, 0, "Arise, villagers, protect your master!")
+   end
+end
+
+RegisterUnitEvent(GATEKEEPER.entry, 1, "GATEKEEPER.OnCombat")
+RegisterUnitEvent(GATEKEEPER.entry, 2, "GATEKEEPER.removeEvents")
+RegisterUnitEvent(GATEKEEPER.entry, 4, "GATEKEEPER.removeEvents")

@@ -1,0 +1,95 @@
+ATONOF = {}
+--Follow the comments, so you can make your own!
+
+local entries = 
+{
+ ["ramdun"] = 1,
+ ["carthoon"] = 2,
+ ["felthrum"] = 3,
+ ["gorrak"] = 4,
+ ["shiratus"] = 5,
+ ["illiumfel"] = 6,
+ ["dreadwing"] = 7,
+ ["vagath"] = 8,
+ ["aramachus"] = 9
+}
+--this is fairly obvious. format: ["NAME"] = entryID,
+--remember to NOT PUT A COMMA after the last row.
+
+local HYP_AGENTS = 
+{
+ [entries.ramdun] = { {"c", 10000, "mt", 22936}, {"c", 18000, "mt", 59105} },
+ [entries.carthoon] = { {"c", 8000, "mt", 22936}, {"c", 14000, "mt", 59105} },
+ [entries.felthrum] = { {"c", 6000, "mt", 22936}, {"c", 10000, "mt", 59105}, {"c", 15000, "mt", 35334} },
+ [entries.gorrak] = { {"c", 15000, "mt", 40327}, {"%", 30, "mt", 29540} },
+ [entries.shiratus] = { {"c", 13000, "mt", 40327}, {"%", 50, "mt", 29540} },
+ [entries.illiumfel] = { {"c", 11000, "mt", 40327}, {"%", "80|30", "mt", 29540}, {"%", 30, "self", 29911} },
+ [entries.dreadwing] = { {"c", 7500, "mt", 50661}, {"c", 3100, "mt", 47809} },
+ [entries.vagath] = { {"c", 7500, "mt", 50661}, {"c", 2300, "mt", 69211} },
+ [entries.aramachus] = { {"c", 7500, "mt", 50661}, {"c", 2300, "mt", 69211}, {"%", "80|20", "self", 52720} }
+}
+--format: [entries.NAME] = { {"eventtype",pct/delay,"target",spellid}, {"eventtype",pct/delay,"target",spellid}, ... },
+--remember to NOT PUT A COMMA after the final records.
+--the NAME after entries.NAME is the same as the NAME from above.
+--eventtype can either be "c" for repeated casting, or "%" for when the mob gets to a certain % health.
+--if eventtype was "c" then pct/delay is THE CAST DELAY IN MILLISECONDS.
+--if eventtype was "%" then pct/delay is THE PERCENTAGE OF HEALTH THE MOB WILL CAST THE SPELL AT.
+--  additionally, if more than one health percent is necessary, you can do "pct1|pct2|pct3", examples are provided. Whole numbers only please.
+--target can be "mt" (maintank), "rand" (random player) or "self".
+--spellid is self explanatory.
+
+--DONE, NO NEED TO SCROLL FURTHER!
+
+function CreateClosure(method, ...)
+   local args = arg
+   local closure = function(...) return method(unpack(arg), unpack(args)) end
+   return closure
+end
+
+function ATONOF.OnCombat(pUnit)
+   ATONOF[tostring(pUnit)] = {}
+   local agent = HYP_AGENTS[pUnit:GetEntry()]
+   for a,event in ipairs(agent) do
+      if (event[1] == "c") then
+         pUnit:RegisterEvent(CreateClosure(event[3], event[4]), event[2], 0)
+      elseif (event[1] == "%") then
+         if (type(event[2]) == "string") then
+            local regme = function(c)
+               pUnit:RegisterEvent(CreateClosure(event[3], event[4], tonumber(c)), 1000, 0)
+            end
+            event[2]:gsub("(%d+)|*", regme)
+         elseif (type(event[2]) == "number") then
+            pUnit:RegisterEvent(CreateClosure(event[3], event[4], event[2]), 1000, 0)
+         end
+      end
+   end
+end
+
+function ATONOF.Remove(pUnit)
+   pUnit:RemoveEvents()
+end
+
+function ATONOF.Percentage(pUnit, target, spell, pct)
+   if (pUnit:GetHealthPct() <= percent and ATONOF[tostring(pUnit)]["_"..pct] == nil) then
+      ATONOF[tostring(pUnit)]["_"..pct] = true
+      local tar = target
+      if (target == "mt") then tar = pUnit:GetMainTank(); end
+      if (target == "rand") then tar = pUnit:GetRandomPlayer(0); end
+      if (target == "self") then tar = pUnit; end
+      pUnit:CastSpellOnTarget(spell, tar)
+   end
+end
+
+function ATONOF.ChainCast(pUnit, target, spell)
+   local tar = target
+   if (target == "mt") then tar = pUnit:GetMainTank(); end
+   if (target == "rand") then tar = pUnit:GetRandomPlayer(0); end
+   if (target == "self") then tar = pUnit; end
+   pUnit:CastSpellOnTarget(spell, tar)
+end
+
+for _,v in pairs(entries) do
+   RegisterUnitEvent(v, 1, "ATONOF.OnCombat")
+   RegisterUnitEvent(v, 2, "ATONOF.Remove")
+   RegisterUnitEvent(v, 4, "ATONOF.Remove")
+end

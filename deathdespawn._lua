@@ -1,0 +1,7 @@
+function deathdesp(p, e, k)
+	local function wait1()
+		p:Despawn(1, 1000)
+	end
+	CreateLuaEvent(wait1, 1000, 1)
+end
+RegisterUnitEvent(70000, 4, deathdesp)

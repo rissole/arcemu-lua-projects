@@ -1,0 +1,107 @@
+--[[
+      __                        __  __                  ______                 
+     /\ \                      /\ \/\ \                /\  _  \                 
+     \ \ \      __  __     __  \ \ \_\ \  __  __  _____\ \ \_\ \  _____  ___   
+      \ \ \  __/\ \/\ \  /'__`\ \ \  _  \/\ \/\ \/\ '__`\ \  __ \/\`'__\/'___\  
+       \ \ \_\ \ \ \_\ \/\ \_\.\_\ \ \ \ \ \ \_\ \ \ \_\ \ \ \/\ \ \ \//\ \__/  
+        \ \____/\ \____/\ \__/ \_\\ \_\ \_\/`____ \ \  __/\ \_\ \_\ \_\\ \____\ 
+         \/___/  \/___/  \/__/\/_/ \/_/\/_/`/___// \ \ \/  \/_/\/_/\/_/ \/____/ 
+                                              /\___/\ \_\                       
+                                              \/__/  \/_/
+Example 1: Statue activation
+Utilises "GetInventoryItemById", "GetDistanceYards"
+]]--
+
+OBJECT_END = 0x0006
+UNIT_FIELD_FLAGS = OBJECT_END + 0x0034
+UNIT_FLAG_NOT_SELECTABLE = 0x02000000
+UNIT_NPC_EMOTESTATE = OBJECT_END + 0x004D
+EMOTE_STATE_SUBMERGED = 429
+local NPC_ENTRY = 74000
+local ITEM_ENTRY = 74000
+
+INCARCERA = {}
+
+function INCARCERA.OnLoad(pUnit)
+	local sUnit = tostring(pUnit)
+	INCARCERA[sUnit] = {}
+	INCARCERA[sUnit].reacted = {}
+	pUnit:SetUInt32Value(UNIT_FIELD_FLAGS, UNIT_FLAG_NOT_SELECTABLE)
+	pUnit:SetCombatCapable(1)
+	pUnit:SetUInt32Value(UNIT_NPC_EMOTESTATE, EMOTE_STATE_SUBMERGED)
+	pUnit:RegisterEvent("INCARCERA.SearchPlayers", 1000, 0)
+	pUnit:RegisterEvent("INCARCERA.ClearReacted", 1000, 0)
+end
+
+function INCARCERA.SearchPlayers(pUnit)
+	for k,v in pairs(pUnit:GetInRangePlayers()) do
+		if (v:GetItemCount(ITEM_ENTRY) > 0 and INCARCERA[tostring(pUnit)].reacted[v] ~= true and pUnit:GetDistanceYards(v) < 30) then
+			local pItem = v:GetInventoryItemById(ITEM_ENTRY)
+			pItem:GossipCreateMenu(ITEM_ENTRY, v, 0)
+			pItem:GossipMenuAddItem(9, "Activate Uther's Light", 0, 0)
+			pItem:GossipMenuAddItem(9, "Ignore the statue...", 1, 0)
+			pItem:GossipSendMenu(v)
+			INCARCERA[tostring(pUnit)].reacted[v] = true
+			INCARCERA[tostring(pItem)] = pUnit
+		end
+	end
+end
+
+function INCARCERA.ClearReacted(pUnit)
+	for k,v in pairs(INCARCERA[tostring(pUnit)].reacted) do
+		if (v ~= nil and k ~= nil) then
+			if (pUnit:GetDistanceYards(k) > 30) then
+				INCARCERA[tostring(pUnit)].reacted[k] = false
+				k:GossipComplete()
+			end
+		end
+	end
+end
+
+function INCARCERA.ItemOnGossipSelect(item, event, player, id, intid, code)
+	if (intid == 1) then
+		player:GossipComplete()
+	elseif (intid == 0) then
+		if (INCARCERA[tostring(item)]:GetUInt32Value(UNIT_FIELD_FLAGS) == UNIT_FLAG_NOT_SELECTABLE) then
+			local boss = INCARCERA[tostring(item)]
+			player:GossipComplete()
+			boss:RemoveEvents()
+			boss:SendChatMessage(42, 0, "The statue reacts to the revealing light...")
+			boss:CastSpell(46821) --light visual
+			boss:RegisterEvent("INCARCERA.BattleBegin", 5000, 1)
+		else
+			player:GossipComplete()
+		end
+	end
+end
+
+function INCARCERA.BattleBegin(pUnit)
+	pUnit:SetUInt32Value(UNIT_FIELD_FLAGS, 0)
+	pUnit:SetCombatCapable(0)
+	pUnit:RemoveAllAuras()
+	pUnit:CastSpell(61463) --shadowfury
+	pUnit:SendChatMessage(14, 0, "I will not fail the dark master!")
+	--Register any boss phases here.
+end
+
+function INCARCERA.OnLeaveCombat(pUnit)
+	pUnit:RemoveEvents()
+	INCARCERA[tostring(pUnit)].reacted = {}
+	INCARCERA.OnLoad(pUnit) --Calling OnLoad function. Just like copying and pasting it's contents to here.
+end
+
+function INCARCERA.OnDeath(pUnit)
+	pUnit:RemoveEvents()
+	INCARCERA[tostring(pUnit)].reacted = {}
+end
+
+--Registering events
+if (GetLuaEngine() ~= "LuaHypArc") then --we gotta make sure they're using LuaHypArc!
+	print("LuaEngine: Did not load 'Incarcera - Statue Activation' script - LuaHypArc not installed.")
+	print("LuaEngine: Please visit http://luahyparc.zapto.org/ for more information.")
+else
+	RegisterUnitEvent(NPC_ENTRY, 18, "INCARCERA.OnLoad")
+	RegisterUnitEvent(NPC_ENTRY, 4, "INCARCERA.OnDeath")
+	RegisterUnitEvent(NPC_ENTRY, 2, "INCARCERA.OnLeaveCombat")
+	RegisterItemGossipEvent(ITEM_ENTRY, 2, "INCARCERA.ItemOnGossipSelect")
+end

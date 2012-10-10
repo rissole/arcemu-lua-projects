@@ -1,0 +1,21 @@
+-----------------------
+--Made by Hypersniper--
+-----Project Ronin-----
+-----------------------
+
+local TELE_ITEMS = {
+  --[entry_id] = {map_id, x, y, z}, <-- [but no comma on last entry]
+  [9563] = {1, 2712.7, -3841.4, 101.4}
+}
+
+local function OnUse(item, e, player)
+   local m,x,y,z = unpack(TELE_ITEMS[item:GetEntryId()])
+   player:Teleport(m,x,y,z) 
+   if (item:GetEntryId() == 9563) then
+      player:SetBindPoint(x, y, z, 1, 16)
+   end
+end
+
+for id, _ in pairs(TELE_ITEMS) do
+   RegisterItemGossipEvent(id, 1, OnUse)
+end

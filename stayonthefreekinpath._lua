@@ -1,0 +1,37 @@
+-----------------------
+--Made by Hypersniper--
+-----Project Ronin-----
+-----------------------
+
+local nWhisperer = 300
+local nGO = 900
+
+local OBJECT_END = 0x0006
+local UNIT_FIELD_FLAGS = OBJECT_END + 0x0035
+local UNIT_FLAG_NOT_SELECTABLE = 0x2000000
+
+function ONTHEPATH_SetupWhisperer(pUnit)
+   pUnit:SetUInt32Value(UNIT_FIELD_FLAGS, UNIT_FLAG_NOT_SELECTABLE)
+   pUnit:SetCombatCapable(1)
+   pUnit:RegisterEvent(ONTHEPATCH_CheckInstancePlayers, 500, 0)
+end
+
+function ONTHEPATH_CheckInstancePlayers(pUnit)
+   local playersTable = GetPlayersInInstance(pUnit:GetMapId(), pUnit:GetInstanceID())
+   if (playersTable == nil) then return; end
+   for k,player in pairs(playersTable) do
+      local x,y,z = unpack(player:GetLocation())
+      local go = player:GetGameObjectNearestCoords(x, y, z, nGO)
+      if (not go) then return; end
+      local x2,y2,z2 = go:GetLocation()
+      local yards = PathLib._DistToPoint(x,y,z,0,x2,y2,z2,0)
+      if (yards > 100) then
+         local retx = go:GetX() + 5 * math.cos(go:GetO())
+         local rety = go:GetY() + 5 * math.sin(go:GetO())
+         player:SetPosition(retx, rety, go:GetZ(), go:GetO())
+         pUnit:SendChatMessageToPlayer(15, 0, "Sssssstay oooon theeee paaaaaath....", player)
+      end
+   end
+end
+
+RegisterUnitEvent(nWhisperer, 18, ONTHEPATH_SetupWhisperer)

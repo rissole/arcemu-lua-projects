@@ -1,0 +1,90 @@
+-----------------------
+--Made by Hypersniper--
+-----Project Ronin-----
+-----------------------
+
+local mod = getfenv(1)
+assert(type(mod) == "table", "Critical error, parent module missing!")
+module(mod._NAME..".CLOSE_TO_HOME", package.seeall)
+local self = getfenv(1)
+
+--------------------------
+
+local nMumiko = 175
+local nCloseToHome = 33
+
+local mumiko_path_coords = {
+   {2490.42,-2509.81,110.14,3.85},
+   {2483.35,-2519.73,108.52,3.52},
+   {2465.81,-2523.46,110.32,3.08}
+}
+
+--------------------------
+
+function ResetValues(pUnit)
+   pUnit:ModifyWalkSpeed(2.5)
+   pUnit:SetFaction(pUnit:GetNativeFaction())
+   pUnit:SetMovementType(2)
+end
+
+function KillerWasShizu(pUnit)
+   if (tostring(mod.VIGILANTE_JUSTICE.units.shizu) == tostring(pUnit)) then
+      return true
+   else
+      return false
+   end
+end
+
+function PreUnitDie(event, pKiller, pVictim)
+   if (KillerWasShizu(pKiller)) then
+      pKiller:WipeTargetList(); pKiller:WipeThreatList();
+      pKiller = mod.VIGILANTE_JUSTICE.units.player
+      if (not pKiller) then return true; end
+   end
+   if (pKiller:IsPlayer() and pVictim:GetEntry() == nMumiko and pKiller:HasQuest(nCloseToHome) and not pKiller:HasFinishedQuest(nCloseToHome)) then
+      pVictim:WipeTargetList(); pVictim:WipeThreatList();
+      pVictim:RemoveAllAuras()
+      pVictim:SetMovementType(4)
+      pVictim:Despawn(120000, 5)
+      pVictim:SetFaction(35)
+      pVictim:SetUInt32Value(mod.UNIT_FIELD_FLAGS, mod.UNIT_FLAG_NOT_SELECTABLE)
+      pVictim:Emote(20, 2000) --beg
+      pVictim:SetUInt32Value(mod.UNIT_NPC_FLAGS, 1) --gossip me now
+      local function _500millidelay()
+         pVictim:SetUInt32Value(mod.UNIT_FIELD_FLAGS, 0)
+      end
+      pVictim:RegisterEvent(_500millidelay, 500, 1)
+      return 0
+   end
+end
+
+function OnGossip(pUnit, e, player)
+   pUnit:StopMovement(1)
+   pUnit:GossipCreateMenu(27, player, 0) --Why... why do spare me?
+   pUnit:GossipMenuAddItem(0, "Your family is worried about you. Go home.", 1, 0)
+   pUnit:GossipSendMenu(player)
+end
+
+function OnGossipSel(pUnit, e, player, id, intid, code)
+   pUnit:SetUInt32Value(mod.UNIT_NPC_FLAGS, 0)
+   pUnit:SendChatMessage(12, 0, "I... I didn't know. I'm sorry for attacking you, stranger, I never meant to get tangled up in this mess. I'll head home right away!")
+   player:MarkQuestObjectiveAsComplete(nCloseToHome, 0)
+   local function _4sdelay()
+      local path = PathLib.Create(pUnit, 8, mumiko_path_coords, Mumiko_OnPath)
+      path:StartPath()
+   end
+   pUnit:RegisterEvent(_4sdelay, 4000, 1)
+end
+
+function Mumiko_OnPath(path)
+   if (path.currentNode == #(path.coords)) then
+      path.unit:Despawn(5, 120000)
+      return
+   end
+   path:Continue(true)
+end
+
+RegisterServerHook(28, PreUnitDie)
+RegisterUnitEvent(nMumiko, 18, ResetValues) --must have at least 1 unit event in order to use RegisterEvent
+RegisterUnitGossipEvent(nMumiko, 1, OnGossip)
+RegisterUnitGossipEvent(nMumiko, 2, OnGossipSel)

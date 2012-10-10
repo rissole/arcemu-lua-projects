@@ -1,0 +1,324 @@
+-----------------------
+--Made by Hypersniper--
+-----Project Ronin-----
+-----------------------
+
+local mod = getfenv(1)
+assert(type(mod) == "table", "RONIN_DUNGEON: Critical error, parent module missing!")
+module(mod._NAME..".CLEVER_RUSE", package.seeall)
+local self = getfenv(1)
+
+local laura = 30 --entries
+local xik_corpse = 31
+local laura_prereq = 7 --quest
+local laura_starts = 10 --quest
+local item_entry = 4866 --quest item
+local satyr = 28
+local fila = 29
+local sirrah = 34
+local sealed_door = 205
+local chamber_door = 206
+local access_lever = 449
+
+local fila_path = { {825.00,508.18,230.13,2.07}, {821.05,514.35,228.84,2.38} }
+local door2_coords = {806.89,510.98,231.34,3.71}
+local room_entrance = {798.38,483.53,233.22,4.95}
+local sirrah_walks = { {803.24,474.84,232.59,3.32}, {801.02,468.90,234.65,4.88} }
+
+function DistToPoint(x,y,z,o,x2,y2,z2,o2)
+   local posTar = {x, y, z}
+   local posNow = {x2, y2, z2}
+   local distance = 0
+   for i,v in ipairs(posNow) do
+      distance = distance + (v-posTar[i])^2
+   end
+   return math.sqrt(distance) --yards
+end
+
+function TimeToPoint(x,y,z,o,x2,y2,z2,o2,speed)
+   local dist = DistToPoint(x,y,z,o,x2,y2,z2,o2)
+   return math.floor((dist / speed) * 1000)
+end
+
+function CRA(u1,u2)
+   if (u1 == nil or u2 == nil) then return nil; end
+   return u1:CalcRadAngle(u1:GetX(), u1:GetY(), u2:GetX(), u2:GetY())
+end
+
+function HyperActivate(pGo, bOpen)
+   if (bOpen) then bOpen = 0; else bOpen = 1; end
+   pGo:SetUInt32Value(17, bOpen) --GAMEOBJECT_BYTES_1
+end
+
+function SetDeathVisuals(pUnit)
+   pUnit:SetStandState(7)
+   pUnit:SetUInt32Value(mod.UNIT_FIELD_FLAGS, mod.UNIT_FLAG_NOT_ATTACKABLE_2)
+   pUnit:SetUInt32Value(mod.UNIT_DYNAMIC_FLAGS, mod.U_DYN_FLAG_DEAD)
+   pUnit:SetCombatCapable(1)
+end
+
+function Laura_OnSpawn(pUnit)
+   pUnit:RegisterEvent(Laura_OnSpawnDelay, 200, 1)
+end
+
+function Laura_OnSpawnDelay(pUnit)
+   pUnit:CastSpell(6408) --faded
+   self[tostring(pUnit)] = { talked = {} }
+   pUnit:RegisterEvent(Laura_PstNearby, 500, 0)
+end
+
+function Laura_PstNearby(pUnit)
+   for k,v in pairs(pUnit:GetInRangePlayers()) do
+      if (pUnit:GetDistanceYards(v) < 10 and v:HasQuest(laura_prereq) and self[tostring(pUnit)].talked[v:GetName()] == nil) then
+         self[tostring(pUnit)].talked[v:GetName()] = true
+         v:SendChatMessageToPlayer(15, 0, "Psssst. Hey! Over here!", v)
+      end
+   end
+end
+
+function OnQuestAccept(event, player, id, pUnit)
+   if (id == laura_starts and pUnit) then
+      pUnit:SendChatMessage(12, 0, "Better hurry! He's due to report soon and if you wait too long, they'll get suspicious!")
+   end
+end
+
+function OnItemUse(item, event, player)
+   if (player:GetDisplay() ~= 14380) then
+      player:SetModel(14380) --gasp you're xik now
+      player:SetFaction(35)
+      player:AddAura(32756, 900000, true) --"shadowy disguise", 15 min
+      local aura = player:GetAuraObjectById(32756)
+      aura:SetVar("AuraInterruptFlags", bit_or(0x2,0x1000,0x8000))
+   end
+end
+
+function OnAuraRemove(event, aura)
+   if (aura:GetSpellId() ~= 32756) then return; end
+   if (aura:GetTarget():IsPlayer() and aura:GetTarget():GetDisplay() ~= 14380) then return; end
+   local player = aura:GetTarget()
+   local pFila = mod.GetCreatureInRange(player, fila)
+   if (pFila) then pFila:RemoveEvents(); end
+   player:SetModel(player:GetNativeDisplay()) --gasp you're you again
+   player:SetFaction(5)
+   if (player:IsPacified()) then
+      player:SetPlayerLock(0)
+      player:MovePlayerTo(player:GetX(), player:GetY(), player:GetZ(), player:GetO(), 0)
+      local door = player:GetGameObjectNearestCoords(fila_path[1][1], fila_path[1][2], fila_path[1][3], sealed_door)
+      local x,y,z,o = unpack(door2_coords)
+      local door2 = player:GetGameObjectNearestCoords(x, y, z, sealed_door)
+      if (door) then
+         HyperActivate(door, false)
+      end
+      if (door2) then
+         HyperActivate(door, false)
+      end
+   end
+end
+
+function OnLogoutRequest(e, player)
+   player:RemoveAura(32756)
+end
+
+function OnChat(event, player, msg, ttype, lang, misc) --iunno about this.
+   if (player:HasAura(32756) and (ttype == 1 or ttype == 6)) then
+      player:SendAreaTriggerMessage("|cFFFF0000You can't talk while in the disguise.")
+      return 0
+   end
+end
+
+function Minion_OnCombat(pUnit, e, pTarget)
+   pUnit:RemoveEvents()
+   local sir = mod.GetCreatureInRange(pUnit, sirrah)
+   if (sir and sir:IsAlive()) then
+      pUnit:CastSpell(31901) --demonic shield
+   end
+   if (pUnit:GetEntry() == satyr) then
+      pUnit:EventCastSpell(pUnit, 52968, 2000, 1) --heartblood rage
+      pUnit:RegisterEvent(Satyr_Swipe, 4000, 0)
+   end
+end
+
+function Satyr_Swipe(pUnit)
+   pUnit:CastSpellOnTarget(31279, pUnit:GetMainTank())
+end
+
+function Fila_OnSpawn(pUnit)
+   self[tostring(pUnit)] = nil
+   pUnit:SetMovementFlags(0)
+   pUnit:RegisterEvent(Fila_CheckForPlayers, 100, 0)
+end
+
+function Fila_CheckForPlayers(pUnit)
+   for _,v in pairs(pUnit:GetInRangePlayers()) do
+      if (v:HasAura(32756) and pUnit:GetDistanceYards(v) <= 15 and pUnit:IsInFront(v)) then
+         pUnit:RemoveEvents()
+         pUnit:SendChatMessage(12, 0, "There you are, he's been expecting you. Come on.")
+         v:SetPlayerLock(1)
+         v:MovePlayerTo(pUnit:GetX(), pUnit:GetY(), pUnit:GetZ(), pUnit:GetO()-math.pi, 0)
+         local function _3sdelay()
+            local x,y,z,o = pUnit:GetLocation()
+            local xt,yt,zt,ot = unpack(fila_path[1])
+            pUnit:MoveTo(unpack(fila_path[1]))
+            pUnit:RegisterEvent(Fila_WalkPlayerIn, TimeToPoint(x,y,z,o,xt,yt,zt,ot,2.5), 1)
+            self[tostring(pUnit)] = v
+         end
+         pUnit:RegisterEvent(_3sdelay, 3000, 1)
+         return
+      end
+   end
+end
+
+function Fila_WalkPlayerIn(pUnit)
+   if (not self[tostring(pUnit)]:IsInWorld()) then pUnit:Despawn(5, 30000); end
+   local door = pUnit:GetGameObjectNearestCoords(pUnit:GetX(), pUnit:GetY(), pUnit:GetZ(), sealed_door)
+   HyperActivate(door, true)
+   local player = self[tostring(pUnit)]
+   pUnit:MoveTo(unpack(fila_path[2]))
+   local x,y,z,o = player:GetLocation()
+   local xt = fila_path[2][1]+5*math.cos(fila_path[2][4])
+   local yt = fila_path[2][2]+5*math.sin(fila_path[2][4])
+   local zt = fila_path[2][3]+2--pUnit:GetLandHeight(xt,yt)
+   local ot = fila_path[2][4]
+   player:MovePlayerTo(xt,yt,zt,ot,0)
+   pUnit:RegisterEvent(Fila_DoorClose, TimeToPoint(x,y,z,o,xt,yt,zt,ot,2.5), 1)
+end
+
+function Fila_DoorClose(pUnit)
+   local door = pUnit:GetGameObjectNearestCoords(pUnit:GetX(), pUnit:GetY(), pUnit:GetZ(), sealed_door)
+   HyperActivate(door, false)
+   if (not self[tostring(pUnit)]:IsInWorld()) then pUnit:Despawn(5, 30000); end
+   local x,y,z,o = unpack(door2_coords)
+   local xo,yo,zo,oo = self[tostring(pUnit)]:GetLocation()
+   local door2 = pUnit:GetGameObjectNearestCoords(x, y, z, sealed_door)
+   HyperActivate(door2, true)
+   self[tostring(pUnit)]:MovePlayerTo(x,y,z,o,0)
+   pUnit:RegisterEvent(Fila_DoorClose2, TimeToPoint(xo,yo,zo,oo,x,y,z,o,2.5), 1)
+end
+
+function Fila_DoorClose2(pUnit)
+   local x,y,z,o = unpack(door2_coords)
+   local door2 = pUnit:GetGameObjectNearestCoords(x, y, z, sealed_door)
+   HyperActivate(door2, false)
+   local function Fila_PostDoorClose2()
+      if (not self[tostring(pUnit)]:IsInWorld()) then pUnit:Despawn(5, 30000); end
+      self[tostring(pUnit)]:SetPlayerLock(0)
+      pUnit:Despawn(5, 120000)
+   end
+   pUnit:RegisterEvent(Fila_PostDoorClose2, 2000, 1)
+end
+
+function Sirrah_OnSpawn(pUnit)
+   pUnit:SetUInt32Value(mod.UNIT_FIELD_FLAGS, mod.UNIT_FLAG_NOT_ATTACKABLE_2)
+   pUnit:SetCombatCapable(1)
+   pUnit:SetMovementFlags(0)
+   pUnit:RegisterEvent(Sirrah_CheckPlayersInRoom, 100, 0)
+end
+
+function Sirrah_CheckPlayersInRoom(pUnit)
+   for _,v in pairs(pUnit:GetInRangePlayers()) do
+      local x,y,z,o = v:GetLocation()
+      local xt,yt,zt,ot = unpack(room_entrance)
+      if (DistToPoint(x,y,z,o,xt,yt,zt,ot) <= 2 and v:GetDisplay() == 14380) then
+         pUnit:RemoveEvents()
+         pUnit:SendChatMessage(12, 0, "Ah, I've been waiting for you.")
+         local xt,yt,zt,ot = unpack(sirrah_walks[1])
+         pUnit:MoveTo(xt,yt,zt,ot)
+         local x,y,z,o = pUnit:GetLocation()
+         pUnit:RegisterEvent(mod.CreateClosure(Sirrah_Walk2,v), TimeToPoint(x,y,z,o,xt,yt,zt,ot,2.5), 1)
+         return
+      end
+   end
+end
+
+function Sirrah_Walk2(pUnit, player)
+   if (not player:IsInWorld()) then pUnit:Despawn(5, 30000); end
+   pUnit:SetFacing(CRA(pUnit,player))
+   pUnit:SendChatMessage(12, 0, "Those bothersome warriors outside are keeping us from capturing any Arts-users in this valley... a setback that has taken too much of our time and too many of our resources.")
+   local function _6sdelay()
+      local xt,yt,zt,ot = unpack(sirrah_walks[2])
+      pUnit:MoveTo(xt,yt,zt,ot)
+      local x,y,z,o = pUnit:GetLocation()
+      pUnit:RegisterEvent(mod.CreateClosure(Sirrah_Walk3,player), TimeToPoint(x,y,z,o,xt,yt,zt,ot,2.5), 1)
+   end
+   pUnit:RegisterEvent(_6sdelay, 6000, 1)
+end
+
+function Sirrah_Walk3(pUnit, player)
+   pUnit:SendChatMessage(12, 0, "It's getting dangerous to even walk the halls of this base. I'd imagine some of those mortals are hiding right under our very noses...")
+   local function _4sdelay()
+      if (not player:IsInWorld()) then pUnit:Despawn(5, 30000); end
+      pUnit:SetFacing(CRA(pUnit, player))
+      pUnit:SendChatMessage(12, 0, "...I can't say you're of great value to the plans here, but I need every demon I can get. Proceed with caution about your regular duties.")
+      pUnit:RegisterEvent(mod.CreateClosure(Sirrah_PostWalks,player), 4000, 1)
+   end
+   pUnit:RegisterEvent(_4sdelay, 4000, 1)
+end
+
+function Sirrah_PostWalks(pUnit, player)
+   if (not player:IsInWorld()) then pUnit:Despawn(5, 30000); end
+   pUnit:CastSpellOnTarget(69391, player) --dark blessing
+   player:CastSpell(31901) --demonic shield
+   player:RemoveAura(32756) --noes!
+   local function _2sdelay()
+      pUnit:SetUInt32Value(mod.UNIT_FIELD_FLAGS, 0)
+      pUnit:SetCombatCapable(0)
+      pUnit:AttackReaction(player, 1, 0)
+   end
+   pUnit:RegisterEvent(_2sdelay, 2000, 1)
+end
+
+function Sirrah_EnterCombat(pUnit, e, player)
+   pUnit:SetMovementFlags(1)
+   pUnit:SendChatMessage(14, 0, "What is this?! No mortal shall escape my sight and remain breathing!")
+   local x,y,z,o = unpack(room_entrance)
+   local door = pUnit:GetGameObjectNearestCoords(x, y, z, chamber_door)
+   door:SetUInt32Value(9, 0x1) --unclickable.
+   pUnit:CastSpell(35491) --furious rage
+   pUnit:CastSpell(32008) --"fel fire"
+   local function claw()
+      pUnit:CastSpellOnTarget(16827, pUnit:GetMainTank()) --claw
+   end
+   pUnit:RegisterEvent(claw, 4000, 0)
+end
+
+function Sirrah_Reset(pUnit)
+   local x,y,z,o = unpack(room_entrance)
+   local door = pUnit:GetGameObjectNearestCoords(x, y, z, chamber_door)
+   door:SetUInt32Value(9, 0x0) --clickable.
+   pUnit:RemoveEvents()
+   Sirrah_OnSpawn(pUnit)
+end
+
+function Lever_Use(pGo, event, player)
+   local door = pGo:GetGameObjectNearestCoords(pGo:GetX(), pGo:GetY(), pGo:GetZ(), sealed_door)
+   HyperActivate(door, true)
+   HyperActivate(pGo, false)
+   local function close()
+      HyperActivate(door, false)
+      HyperActivate(pGo, false)
+      pGo:SetUInt32Value(9, 0x0) --clickable.
+   end
+   pGo:CreateLuaEvent(close, 3000, 1)
+end
+
+function Fila_LeaveCombat(pUnit)
+   pUnit:ReturnToSpawnPoint()
+   Fila_OnSpawn(pUnit)
+end
+
+RegisterUnitEvent(xik_corpse, 18, SetDeathVisuals)
+RegisterUnitEvent(laura, 18, Laura_OnSpawn)
+RegisterUnitEvent(satyr, 1, Minion_OnCombat)
+RegisterUnitEvent(fila, 1, Minion_OnCombat)
+RegisterUnitEvent(fila, 2, Fila_LeaveCombat)
+RegisterUnitEvent(fila, 18, Fila_OnSpawn)
+RegisterServerHook(14, OnQuestAccept)
+RegisterServerHook(31, OnAuraRemove)
+RegisterServerHook(12, OnLogoutRequest)
+RegisterServerHook(16, OnChat) --iunno about this.
+RegisterItemGossipEvent(item_entry, 1, OnItemUse)
+RegisterUnitEvent(sirrah, 18, Sirrah_OnSpawn)
+RegisterUnitEvent(sirrah, 1, Sirrah_EnterCombat)
+RegisterUnitEvent(sirrah, 2, Sirrah_Reset)
+RegisterUnitEvent(sirrah, 4, Sirrah_Reset)
+RegisterGameObjectEvent(access_lever, 4, Lever_Use)

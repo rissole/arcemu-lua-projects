@@ -1,0 +1,10 @@
+function simpleprint1(id)
+   print("Created instance #"..id)
+end
+
+function simpleprint2(id)
+   print("Destroyed instance #"..id)
+end
+
+RegisterInstanceEvent(33, 9, simpleprint1)
+RegisterInstanceEvent(33, 10, simpleprint2)

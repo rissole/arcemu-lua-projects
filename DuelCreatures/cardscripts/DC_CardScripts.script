@@ -1,0 +1,7 @@
+--Put script file names here!
+--DO NOT use .lua extension on scripts!
+return
+{
+   "KilJaeden.script",
+   "Slobbering Zombie.script",
+}

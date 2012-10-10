@@ -1,0 +1,65 @@
+KELDRAM = {}
+
+function KELDRAM.OnLoad(pUnit, event)
+   print("keldram loaded")
+   pUnit:CastSpell(55212)
+end
+
+function KELDRAM.OnCombat(pUnit, event)
+   local target = pUnit:GetMainTank()
+   if (target ~= nil) then
+      if (target:IsDead() == false) then
+         pUnit:FullCastSpellOnTarget(34856,target)
+      else
+         pUnit:RegisterEvent("KELDRAM.OnCombat", 500, 1)
+      end
+   else
+      pUnit:RegisterEvent("KELDRAM.OnCombat", 500, 1)
+   end
+   pUnit:RegisterEvent("KELDRAM.Bloodburn", 6000, 0)
+   pUnit:RegisterEvent("KELDRAM.ArcaneStrike", 10000, 0)
+end
+
+function KELDRAM.Bloodburn(pUnit, event)
+ local target = pUnit:GetMainTank()
+    if (target ~= nil) then
+       if (target:IsDead() == false) then
+	   pUnit:FullCastSpellOnTarget(34856,target)
+       else
+           pUnit:RegisterEvent("KELDRAM.Bloodburn", 500, 1)
+       end
+    else
+	pUnit:RegisterEvent("KELDRAM.Bloodburn", 500, 1)
+  end
+end
+
+function KELDRAM.ArcaneStrike(pUnit, event)
+ local target = pUnit:GetMainTank()
+    if (target ~= nil) then
+       if (target:IsDead() == false) then
+	   pUnit:FullCastSpellOnTarget(34820,target)
+       else
+           pUnit:RegisterEvent("KELDRAM.ArcaneStrike", 500, 1)
+       end
+    else
+	pUnit:RegisterEvent("KELDRAM.ArcaneStrike", 500, 1)
+  end
+end
+
+function KELDRAM.OnLeaveCombat(pUnit, event)
+ pUnit:RemoveEvents()
+end
+
+function KELDRAM.OnDeath(pUnit, event)
+ pUnit:RemoveEvents()
+end
+
+function KELDRAM.OnKilledTarget(pUnit, event)
+ pUnit:RemoveEvents()
+end
+
+RegisterUnitEvent(8000017, 1, "KELDRAM.OnCombat")
+RegisterUnitEvent(8000017, 2, "KELDRAM.OnLeaveCombat")
+RegisterUnitEvent(8000017, 3, "KELDRAM.OnKilledTarget")
+RegisterUnitEvent(8000017, 4, "KELDRAM.OnDeath")
+RegisterUnitEvent(8000017, 18, "KELDRAM.OnLoad")

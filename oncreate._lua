@@ -1,0 +1,8 @@
+function oncreate(go, e)
+   go:CreateLuaEvent(function() realoncreate(go) end, 100, 1)
+end
+
+function realoncreate(go)
+   print(go:GetSpawnId())
+end
+RegisterGameObjectEvent(170565, 2, oncreate)

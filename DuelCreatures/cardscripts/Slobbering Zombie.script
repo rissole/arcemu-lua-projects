@@ -1,0 +1,14 @@
+local SZ = {id = 6}
+
+function SZ.OnPreSpecSummon(event, dcid, slot, mode)
+   local function ss_pass(sender, player, choices)
+      local v = choices[1]
+      RemoveCardFromPlay(_INDEX, _CONSOLE, v, "graveyard")
+      SummonMonsterFromHand(_INDEX, _CONSOLE, slot, dcid, mode, true)
+      if (mode == 0) then SendMessageToDuel(_INDEX, string.format("%s Special Summons %s!", player:GetName(), DC_DB_CACHE[dcid].Name)) end
+      return MainMenu(player)
+   end
+   OfferChoice(_GO, _PLAYER, _CONSOLE, "graveyard", {M_Type = MONSTER_TYPE.Humanoid}, 1, ss_pass)
+end
+
+RegisterCardEvent(SZ.id, EVENTS.PRE_SPECIAL_SUMMON, SZ.OnPreSpecSummon)

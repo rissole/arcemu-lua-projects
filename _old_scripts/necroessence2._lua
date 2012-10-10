@@ -1,0 +1,14 @@
+local transformed = 0
+local itemid = 74778
+
+function Necroessence_OnGossipTalk(item, event, player, pMisc)	
+	if (transformed == 0) then
+		player:SetModel(15945)
+		transformed = 1
+	else
+		player:DeMorph()
+		transformed = 0
+	end
+end
+
+RegisterItemGossipEvent(itemid, 1, "Necroessence_OnGossipTalk")

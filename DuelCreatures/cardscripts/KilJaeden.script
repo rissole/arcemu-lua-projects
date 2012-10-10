@@ -1,0 +1,24 @@
+local UNIT_NPC_EMOTESTATE = 83
+
+local KJ = {id = 5}
+
+function KJ.OnSummon(event, dcid, card)
+   if (card:IsAttackMode()) then
+      local unit = card:GetUnit()
+      unit:Emote(449, 10500)
+      RestrictConsoleAccess(_INDEX, -1, true)
+      unit:CreateLuaEvent(function() RestrictConsoleAccess(_INDEX, -1, false) end, 10500, 1)
+   end
+end
+
+function KJ.OnModeSwitch(event, dcid, card, targetMode)
+   if (targetMode == 1 and card:IsFaceUp()) then --defense
+      local unit = card:GetUnit()
+      unit:SetFacing(unit:GetO() + math.pi)
+      unit:SetUInt32Value(UNIT_NPC_EMOTESTATE, 407)
+      unit:Emote(406, 1000)
+   end
+end
+
+RegisterCardEvent(KJ.id, EVENTS.ON_SUMMON, KJ.OnSummon)
+RegisterCardEvent(KJ.id, EVENTS.ON_MODE_SWITCH, KJ.OnModeSwitch)

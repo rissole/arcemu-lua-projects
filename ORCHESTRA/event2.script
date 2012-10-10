@@ -1,0 +1,309 @@
+-----------------------
+--Made by Hypersniper--
+-----Project Ronin-----
+-----------------------
+
+local par = getfenv(1)
+assert(type(par) == "table", "Orchestra: Critical error, parent module missing!")
+module(par._NAME..".EVENT2", package.seeall)
+local self = getfenv(1)
+
+local nGisuno = 1006
+local nSuside = 1007
+local nUndertaker = 1008
+local nWarden = 1009
+
+local nPortcullisE = 691; local nPortcullisS = 11967;
+local nCellDoorE = 782
+local nCellDoor1S = 11960
+local nCellDoor2S = 11961
+local nCellDoor3S = 11962
+
+local vGisunoSpawn = {-231.51, 2148.40, 95.67, 5.84}
+local vJumpTo = {-229.05, 2147.74, 90.62, 5.84}
+local pRunAway = {
+  {-234.52, 2149.95, 90.62, 0},
+  {-239.67, 2140.45, 87.01, 0},
+  {-248.70, 2143.98, 87.01, 0}
+}
+local vSusideSpawn = {-243.90, 2142.26, 87.00, 5.93}
+local vUndertaker1Spawn = {-244.65, 2143.18, 87.00, 5.93}
+local nCDoorSpawns = {nCellDoor1S, nCellDoor2S, nCellDoor3S}
+local nWardenSpawns = {[3493] = nCellDoor1S, [3492] = nCellDoor2S, [3491] = nCellDoor3S}
+local vCellCoords = {
+   {-238.66, 2132.59, 81.18, 0}, --11960 (door spawns) 3493
+   {-241.08, 2121.85, 81.18, 0}, --11961 3492
+   {-245.16, 2113.88, 81.18, 0}  --11962 3491
+}
+local vSusideSpawn2 = {-235, 2123.26, 87.01, 1.87}
+local vUndertaker1Spawn2 = {-236.94, 2121.13, 87.01, 1.64}
+
+local function OpenCell(pUnit, player) --warden, attacker
+   local nCell = self[player:GetName()]
+   local pGo = par.GetObjectSpawn(player, nCDoorSpawns[nCell])
+   if (pGo:GetByte(GAMEOBJECT_BYTES_1, 0) == 1) then
+      pGo:SetByte(GAMEOBJECT_BYTES_1, 0, 0)
+      return
+   else
+      local pGo = par.GetObjectSpawn(player, nWardenSpawns[pUnit:GetSpawnId()])
+      if (pGo:GetByte(GAMEOBJECT_BYTES_1, 0) == 1) then
+         pGo:SetByte(GAMEOBJECT_BYTES_1, 0, 0)
+         return
+      else
+         for i=1, #nCDoorSpawns do
+            local pGo = par.GetObjectSpawn(player, nCDoorSpawns[i])
+            if (pGo:GetByte(GAMEOBJECT_BYTES_1, 0) == 1) then
+               pGo:SetByte(GAMEOBJECT_BYTES_1, 0, 0)
+               return
+            end
+         end
+      end
+   end
+end
+
+function PortCullis_Spawn(pGo)
+   if (pGo:GetSpawnId() == nPortcullisS) then
+      par.HyperActivate(pGo, true)
+      pGo:SetUInt32Value(GAMEOBJECT_FLAGS, 0x1)
+      self[pGo:GetInstanceID()].p1 = pGo --p1 = entrance door
+      local map = pGo:GetMapId()
+      local iid = pGo:GetInstanceID()
+      pGo:CreateLuaEvent(function() Event2Trigger(map, iid, pGo) end, 500, 0)
+   end
+end
+
+function CellDoor_Spawn(pGo)
+   local s = pGo:GetSpawnId()
+   if (s == nCellDoor1S or s == nCellDoor2S or s == nCellDoor3S) then
+      pGo:SetUInt32Value(GAMEOBJECT_FLAGS, 0x1)
+   end
+end
+
+function Gisuno_Spawn(pUnit)
+   pUnit:SetUInt32Value(UNIT_NPC_EMOTESTATE, 398)
+   pUnit:SetUInt32Value(UNIT_FIELD_FLAGS, UNIT_FLAG_NOT_ATTACKABLE_2)
+   pUnit:RegisterEvent(Gisuno_RunAwayTrig, 500, 0)
+end
+
+function Warden_Spawn(pUnit)
+   self[tostring(pUnit)] = 0
+   pUnit:SetUInt32Value(UNIT_NPC_EMOTESTATE, 403)
+   pUnit:SetUInt32Value(UNIT_FIELD_FLAGS, UNIT_FLAG_NOT_ATTACKABLE_2)
+   pUnit:SetCombatCapable(1)
+end
+
+function Gisuno_RunAwayTrig(pUnit)
+   for k,v in pairs(pUnit:GetInRangePlayers()) do
+      if (pUnit:GetDistanceYards(v) <= 15) then
+         pUnit:RemoveEvents()
+         Gisuno_JumpDown(pUnit)
+         break
+      end
+   end
+end
+
+function Gisuno_JumpDown(pUnit)
+   for k,v in pairs(pUnit:GetInRangeObjects()) do
+      if (v:GetSpawnId() == nLDoorS) then
+         par.HyperActivate(v, false)
+         break
+      end
+   end
+   pUnit:CastSpell(24222)
+   pUnit:SetPosition(unpack(vJumpTo))
+   local function runaway()
+      local path = PathLib.Create(pUnit, 10, pRunAway, Gisuno_OnNode)
+      path:StartPath()
+   end
+   pUnit:RegisterEvent(runaway, 1000, 1)
+end
+
+function Gisuno_OnNode(path)
+   if (path.currentNode ~= #(path.coords)) then path:Continue(); return; end
+   path.unit:Despawn(1, 0)
+end
+
+function Event2Trigger(map, iid, pGo)
+   if (self[iid].status == nil) then --if not started
+      local tUnits = par.GetLivePlayersInInstance(map, iid)
+      for k,v in pairs(tUnits) do
+         local x1,y1,z1,o1 = v:GetLocation()
+         local x2,y2,z2,o2 = unpack(pRunAway[2])
+         if (v:IsInWorld() and v:IsAlive() and PathLib._DistToPoint(x1,y1,z1,o1,x2,y2,z2,o2) <= 7) then
+            BeginEvent2(tUnits)
+            self[iid].status = 1 --in progress now.
+            break
+         end
+      end
+   elseif (self[iid].status == 3) then
+      for k,v in pairs(pGo:GetInRangePlayers()) do
+         if (v:IsInWorld() and v:IsAlive() and v:GetDistanceYards(pGo) < 5) then
+            BeginEvent21(v)
+            self[iid].status = 4
+            break
+         end
+      end
+   end
+end
+
+function BeginEvent2(tUnits)
+   local player = tUnits[1] --there'll be at least 1...
+   local x,y,z,o = unpack(vSusideSpawn)
+   local pSuside = player:SpawnCreature(nSuside, x, y, z, o, 14, 5000)
+   pSuside:SetUInt32Value(UNIT_FIELD_FLAGS, UNIT_FLAG_NOT_ATTACKABLE_2)
+   local x,y,z,o = unpack(vUndertaker1Spawn)
+   local temp = { {0,0}, {0,1}, {1,0}, {1,1} }
+   if (#tUnits > 1) then
+      for i=1, #tUnits - 1 do
+         local u = player:SpawnCreature(nUndertaker, x + temp[i][1], y + temp[i][2], z, o, 14, 5000)
+         u:SetUInt32Value(UNIT_FIELD_FLAGS, UNIT_FLAG_NOT_ATTACKABLE_2)
+         u:CastSpellOnTarget(51724, player) --visual
+      end
+   end
+   for k,v in pairs(tUnits) do
+      pSuside:CastSpellOnTarget(51724, v) --visual
+      v:CastSpell(51724) --should really sap them
+   end
+   --black out part here
+   pSuside:RegisterEvent(TeleToCell, 2000, 1)
+end
+
+function BeginEvent21(player)
+   local tUnits = GetEvent1CreaturesWithEntries(player, nWarden) --remove wardens
+   for k,v in pairs(tUnits) do
+      v:Despawn(5, 0)
+   end
+   local x,y,z,o = unpack(vSusideSpawn2)
+   local pSuside = player:SpawnCreature(nSuside, x, y, z, o, 14, 0)
+   pSuside:SetUInt32Value(UNIT_FIELD_FLAGS, UNIT_FLAG_NOT_ATTACKABLE_2)
+   par.EmoteEventChat(pSuside, 12, 0, "You know, this is nothing personal, really.", 1)
+   par.EmoteEventChat(pSuside, 12, 0, "I just can't allow anyone to interfere with Master Grimoire's plan.", 5000)
+   par.EmoteEventChat(pSuside, 12, 0, "Please, understand. Die a peaceful death by my hand, or suffer by his later.", 10000)
+   local function delay15()
+      pSuside:SetUInt32Value(UNIT_FIELD_FLAGS, 0)
+      local x,y,z,o = unpack(vUndertaker1Spawn2)
+      local temp = { {0,0}, {0,2}, {2,0}, {2,2} }
+      local tUnits = par.GetLivePlayersInInstance(player:GetMapId(), player:GetInstanceID())
+      if (#tUnits > 1) then
+         for i=1, #tUnits - 1 do
+            local u = player:SpawnCreature(nUndertaker, x + temp[i][1], y + temp[i][2], z, o, 14, 0)
+            u:AttackReaction(tUnits[math.random(#tUnits)], 1, 0)
+         end
+      end
+      if (player and player:IsInWorld()) then
+         pSuside:AttackReaction(player, 1, 0)
+      end
+   end
+   pSuside:CreateLuaEvent(delay15, 15000, 1)
+end
+
+function TeleToCell(pUnit)
+   par.CloseAllPreviousDoors(pUnit:GetInstanceID(), 2)
+   local tUnits = par.GetLivePlayersInInstance(pUnit:GetMapId(), pUnit:GetInstanceID())
+   for k,v in pairs(tUnits) do
+      local nCell = math.random(#vCellCoords)
+      local vCoords = vCellCoords[nCell]
+      self[v:GetName()] = nCell
+      v:SetPosition(unpack(vCoords))
+      v:RemoveAura(51724)
+   end
+   local tWardens = par.GetAllWithEntries(pUnit, nWarden)
+   for k,v in pairs(tWardens) do
+      v:SetUInt32Value(UNIT_FIELD_FLAGS, 0)
+   end
+end
+
+function Wardens_OnDamageTaken(pUnit, event, pAttacker, amount)
+   if (pUnit:GetUInt32Value(UNIT_FIELD_FLAGS) == 0 and self[tostring(pUnit)] ~= nil) then
+      self[tostring(pUnit)] = self[tostring(pUnit)] + 1
+      if (self[tostring(pUnit)] < 3) then
+         local msgs = {pUnit:GetName().." stirs.", pUnit:GetName().." murmurs quietly.", pUnit:GetName().." rolls over."}
+         pUnit:SendChatMessage(16, 0, msgs[math.random(#msgs)])
+      elseif (self[tostring(pUnit)] == 3) then
+         pUnit:SendChatMessage(16, 0, pUnit:GetName().." wakes up!")
+         pUnit:CastSpell(31915) --enrage
+         pUnit:SetCombatCapable(0)
+         self[tostring(pUnit)] = nil
+         pUnit:AttackReaction(pAttacker, 1, 0)
+         self[pUnit:GetInstanceID()].status = 3
+         OpenCell(pUnit, pAttacker)
+      end
+   end
+end
+
+function Suside_Combat(pUnit, e, player)
+   GoInvis(pUnit)
+end
+
+function GoInvis(pUnit)
+   pUnit:CastSpell(24222) --vanish
+   pUnit:CastSpell(46076) --invis
+   pUnit:SetCombatCapable(true)
+   pUnit:Root()
+   pUnit:SetUInt32Value(UNIT_FIELD_FLAGS, UNIT_FLAG_NOT_ATTACKABLE_2)
+   local function UnInvis()
+      local tUnits = par.GetLivePlayersInInstance(pUnit:GetMapId(), pUnit:GetInstanceID())
+      local r = tUnits[math.random(#tUnits)]
+      pUnit:SetCombatCapable(false)
+      pUnit:Unroot()
+      pUnit:RemoveAura(46076)
+      pUnit:SetUInt32Value(UNIT_FIELD_FLAGS, 0)
+      if (r and r:IsAlive() and r:IsInWorld()) then
+         pUnit:SetPosition(r:GetX(), r:GetY(), r:GetZ(), r:GetO())
+         pUnit:CastSpellOnTarget(30986, r) --cheap shot
+      end
+      local tBads = par.GetAllWithEntries(pUnit, nSuside, nUndertaker)
+      local nextt = tBads[math.random(#tBads)]
+      nextt:RegisterEvent(GoInvis, 9000, 1)
+   end
+   pUnit:RegisterEvent(UnInvis, math.random(12000, 17000), 1)
+end
+
+function Suside_Die(pUnit)
+   local tLackeys = par.GetAllWithEntries(pUnit, nUndertaker)
+   for k,v in pairs(tLackeys) do
+      if (v:IsAlive() and v:IsInWorld()) then
+         v:RemoveAura(46076) --invis
+         v:CastSpell(24222) --vanish vis
+         v:Despawn(2000, 0)
+      end
+   end
+   self[pUnit:GetInstanceID()].p1:RemoveEvents()
+   par.HyperActivate(self[pUnit:GetInstanceID()].p1, true)
+   par.HyperActivate(self[pUnit:GetInstanceID()].p2, true)
+   self[pUnit:GetInstanceID()].status = 2
+   CreateLuaEvent(function() DespawnMe(pUnit) end, 900000, 1)
+end
+
+function DespawnMe(pUnit)
+   pUnit:Despawn(1, 0)
+end
+
+function WipeAction(id, pVic, pUnit)
+   if (self[id].status == 1) then --wipe after stunning but before pulling warden (is this possible?)
+      par.OpenAllPreviousDoors(id)
+      self[id].status = nil
+   elseif (self[id].status == 3) then --wipe after pulling warden but before engaging boss
+      for k,v in pairs(par.GetAllWithEntries(pVic, nWarden)) do
+         v:Despawn(5, 5)
+      end
+      par.OpenAllPreviousDoors(id)
+      self[id].status = nil
+   elseif (self[id].status == 4) then --wipe during boss
+      for k,v in pairs(par.GetAllWithEntries(pVic, nSuside, nUndertaker)) do
+         v:Despawn(5, 0)
+      end
+      par.OpenAllPreviousDoors(id)
+      self[id].status = 3
+   end
+end
+
+RegisterGameObjectEvent(nPortcullisE, 1, PortCullis_Spawn)
+RegisterGameObjectEvent(nCellDoorE, 1, CellDoor_Spawn)
+RegisterUnitEvent(nGisuno, 18, Gisuno_Spawn)
+RegisterUnitEvent(nSuside, 4, Suside_Die)
+RegisterUnitEvent(nSuside, 1, Suside_Combat)
+RegisterUnitEvent(nUndertaker, 18, function() return end)
+RegisterUnitEvent(nWarden, 23, Wardens_OnDamageTaken)
+RegisterUnitEvent(nWarden, 18, Warden_Spawn)
+RegisterWipeEvent(33, WipeAction)

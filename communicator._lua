@@ -1,0 +1,48 @@
+--simple client-server communicator
+
+local COMMS = {}
+COMMUNICATOR = {}
+
+function COMMUNICATOR.OnChat(event, player, msg, type, lang, misc)
+   if (lang == 0xFFFFFFFF) then --addon message
+      if (string.find(msg, "COMMLINK_%w+C\t")) then --communicator message
+         local _, _, name = string.find(msg, "COMMLINK_(%w+)C\t")
+         msg = string.gsub(msg, "COMMLINK_%w+C\t", "")
+         COMMUNICATOR.OnReceive(player, msg, name)
+      end
+   end
+end
+
+function COMMUNICATOR.Send(player, msg, linkname)
+   assert(linkname:match("^%w+$"), "Invalid link name (use letters only)")
+   player:PlayerSendChatMessage(0, -1, "COMMLINK_"..linkname.."S\t"..msg)
+end
+
+--if an addon with the specified link name is listening...
+function COMMUNICATOR.LinkExists(player, linkname)
+   assert(linkname:match("^%w+$"), "Invalid link name (use letters only)")
+   assert(type(COMMS[linkname]) == "function", "No listener for link "..linkname)
+   player:PlayerSendChatMessage(0, -1, "COMMLINK_"..linkname.."S\tLINKEXISTS")
+   CreateLuaEvent(function() COMMUNICATOR.ExpireLinkExists(player, linkname) end, 3000, 1)
+end
+
+function COMMUNICATOR.ExpireLinkExists(player, linkname)
+   COMMS[linkname](player, "LINKEXISTS:false")
+end
+
+function COMMUNICATOR.OnReceive(player, msg, linkname)
+   if (type(COMMS[linkname]) == "function") then
+      print("SERVER ["..linkname.."]: Received client ["..player:GetName().."] message: "..msg)
+      COMMS[linkname](player, msg)
+   else
+      print("SERVER ["..linkname.."]: Received unhandled client ["..player:GetName().."] message: "..msg)
+   end
+end
+
+function COMMUNICATOR.HookOnReceive(linkname, func)
+   assert(linkname:match("^%w+$"), "Invalid link name (use letters only)")
+   assert(type(func) == "function", "Invalid argument to HookOnReceive, expected function, got "..type(func))
+   COMMS[linkname] = func
+end
+
+RegisterServerHook(16, COMMUNICATOR.OnChat)

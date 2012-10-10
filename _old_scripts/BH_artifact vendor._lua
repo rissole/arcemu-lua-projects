@@ -1,0 +1,108 @@
+-----------------------
+--Made by Hypersniper--
+-------wow-v.com-------
+--For Burning Heavens--
+-----------------------
+
+--[[ Keeper of the Artifacts (Vendor) ]]--
+local KRIMEL = 8000134
+
+--[[ Artifact ]]--
+local ARTIFACT = 60096
+
+--[[ 
+http://www.lua.org/pil/3.6.html if you don't understand the following :)
+Replace the values on the left to what you want the menu selection to say 
+Eg, if you want the menu item to say "Mage Helm" and give item 60035, I'd change 
+MAHELM to Mage Helm, which would look like
+["Mage Helm"] = 60035, 
+]]--
+
+--[[ Mage Artifacts ]]--
+local Mage = 
+{
+["MAHELM"] = 60035,
+["MASHOU"] = 60034,
+["MACHES"] = 60032,
+["MALEGG"] = 60031,
+["MAGLOV"] = 60033
+}
+
+--[[ Warlock Artifacts ]]--
+local Warlock =
+{
+["WARLHE"] = 60081,
+["WARLSH"] = 60082,
+["WARLCH"] = 60083,
+["WARLLE"] = 60085,
+["WARLGL"] = 60084
+}
+
+--[[ Priest Artifacts ]]--
+-- Healing
+local Priest1 = 
+{
+["HPRIHEL"] = 60051,
+["HPRISHO"] = 60052,
+["HPRICHE"] = 60053,
+["HPRILEG"] = 60055,
+["HPRIGLO"] = 60054
+}
+-- Damage
+local Priest2 =
+{
+["DPRIHEL"] = 60056,
+["DPRISHO"] = 60057,
+["DPRICHE"] = 60058,
+["DPRILEG"] = 60060,
+["DPRIGLO"] = 60059
+}
+
+function Krimel_OnGossipTalk(pUnit, event, player)
+    pUnit:GossipCreateMenu(66000, player, 0) --replace 66000 with your npc_text value
+    if (player:GetPlayerClass() == "Warlock") then
+        for k,v in pairs(Warlock) do
+            pUnit:GossipMenuAddItem(1, k, v, 0)
+        end
+    elseif (player:GetPlayerClass() == "Mage") then
+        for k,v in pairs(Mage) do
+            pUnit:GossipMenuAddItem(1, k, v, 0)
+        end
+    elseif (player:GetPlayerClass() == "Priest") then
+        pUnit:GossipMenuAddItem(6, "Purewish Set", 1, 0)
+        pUnit:GossipMenuAddItem(6, "Somberhearted Set", 2, 0)
+    end
+    pUnit:GossipSendMenu(player)
+end
+
+function Krimel_OnGossipSelect(pUnit, event, player, id, intid, code)
+    if (intid == 1) then
+        pUnit:GossipCreateMenu(66000, player, 0)
+        for k,v in pairs(Priest1) do
+            pUnit:GossipMenuAddItem(1, k, v, 0)
+        end
+        pUnit:GossipMenuAddItem(0, "Back", 3, 0)
+        pUnit:GossipSendMenu(player)
+    elseif (intid == 2) then
+        pUnit:GossipCreateMenu(66000, player, 0)
+        for k,v in pairs(Priest2) do
+            pUnit:GossipMenuAddItem(1, k, v, 0)
+        end
+        pUnit:GossipMenuAddItem(0, "Back", 3, 0)
+        pUnit:GossipSendMenu(player)
+    elseif (intid == 3) then
+        Krimel_OnGossipTalk(pUnit, event, player) --back to main menu
+    else
+        if (player:GetItemCount(ARTIFACT) < 1) then
+            player:SendAreaTriggerMessage("You don't have the required item.")
+            player:GossipComplete()
+        else
+            player:AddItem(intid, 1)
+            player:RemoveItem(ARTIFACT, 1)
+            player:GossipComplete()
+        end
+    end
+end
+
+RegisterUnitGossipEvent(KRIMEL, 1, "Krimel_OnGossipTalk")
+RegisterUnitGossipEvent(KRIMEL, 2, "Krimel_OnGossipSelect")

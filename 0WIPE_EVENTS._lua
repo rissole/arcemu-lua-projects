@@ -1,0 +1,26 @@
+local _WIPE_EVENTS = {}
+
+local function checkforwipe(iid, pVictim, pKiller)
+   local map = pVictim:GetMapId()
+   local tPlayers = GetPlayersInInstance(map, iid)
+   for k,v in pairs(tPlayers) do
+      if (tostring(v) ~= tostring(pVictim) and v:IsAlive()) then
+         return
+      end
+   end
+   for i,func in ipairs(_WIPE_EVENTS[map]) do
+      func(iid, pVictim, pKiller)
+   end
+end
+
+function RegisterWipeEvent(map, func)
+   if (type(func) ~= "function" or type(map) ~= "number") then
+      print("RegisterWipeEvent error: invalid argument(s)")
+      return
+   end
+   if (_WIPE_EVENTS[map] == nil) then
+      _WIPE_EVENTS[map] = {}
+      RegisterInstanceEvent(map, 1, checkforwipe)
+   end
+   table.insert(_WIPE_EVENTS[map], func)
+end

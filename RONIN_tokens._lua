@@ -1,0 +1,38 @@
+-----------------------
+--Made by Hypersniper--
+-----Project Ronin-----
+-----------------------
+
+local function onHK(e, killer, victim)
+   local nTokenID, nAmount = 0, 0
+   if (killer:GetLevel() == 15 or victim:GetLevel() == 15) then return; end
+   if (killer:GetLevel() == 1) then
+      nTokenID = 20558
+      nAmount = victim:GetLevel()
+   elseif (killer:GetLevel() == 2) then
+      nTokenID = 20558
+      nAmount = math.max(victim:GetLevel() - 1, 1)
+   elseif (killer:GetLevel() == 3) then
+      nTokenID = 20559
+      if (victim:GetLevel() == 1) then
+         nAmount = 0
+      elseif (victim:GetLevel() == 2) then
+         nAmount = 1
+      elseif (victim:GetLevel() == 4) then
+         nAmount = 2
+      end
+   elseif (killer:GetLevel() == 4) then
+      nTokenID = 20560
+      if (victim:GetLevel() <= 2) then
+         nAmount = 0
+      else
+         nAmount = 1
+      end
+   end
+   if (killer:GetLevel() == victim:GetLevel()) then
+      nAmount = 1
+   end
+   killer:AddItem(nTokenID, nAmount)
+end
+
+RegisterServerHook(23, onHK)

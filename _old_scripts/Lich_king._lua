@@ -1,0 +1,154 @@
+local playerstable
+local Deathknights = {}
+local UNIT_FLAG_DEFAULT
+local ghouls = {}
+
+function Lich_king_OnCombat(unit, event)
+	playerstable = unit:GetInRangePlayers()
+	unit:SetCombatCapable(1)
+	UNIT_FLAG_DEFAULT = unit:GetUInt64Value(UNIT_FIELD_FLAGS)
+	unit:SetUInt64Value(UNIT_FIELD_FLAGS, UNIT_FLAG_NOT_ATTACKABLE_2)
+	unit:SendChatMessage(14, 0, "How dare you defy the power of The Lich King?! Are you here to prove yourself worthy of serving me?")
+	Deathknights[1] = unit:SpawnCreature(16146, unit:GetX()-5, unit:GetY(), unit:GetZ(), unit:GetO(), 14, 0)
+	Deathknights[2] = unit:SpawnCreature(16146, unit:GetX()+5, unit:GetY(), unit:GetZ(), unit:GetO(), 14, 0)
+	Deathknights[3] = unit:SpawnCreature(16146, unit:GetX(), unit:GetY()-5, unit:GetZ(), unit:GetO(), 14, 0)
+	Deathknights[4] = unit:SpawnCreature(16146, unit:GetX(), unit:GetY()+5, unit:GetZ(), unit:GetO(), 14, 0)
+	unit:RegisterEvent("Lich_king_deathcoil", 15000, 0)
+	unit:RegisterEvent("Lich_king_check_dk", 500, 0)
+end
+
+function Lich_king_deathcoil(unit, event)
+	unit:FullCastSpellOnTarget(55210, Deathknights[math.random(1,4)])
+end
+
+function Lich_king_check_dk(unit, event)
+	if (Deathknights[1]:IsDead() == true and Deathknights[2]:IsDead() == true and Deathknights[3]:IsDead() == true and Deathknights[4]:IsDead() == true) then
+		unit:RemoveEvents()
+		unit:SendChatMessage(14, 0, "You are indeed strong, but you haven't faced true power yet. Prepare for the ultimate punishment!")
+		unit:SetCombatCapable(0)
+		unit:SetUInt64Value(UNIT_FIELD_FLAGS, UNIT_FLAG_DEFAULT)
+		unit:RegisterEvent("Lich_king_phase1", 1000, 0)
+	end
+end
+
+function Lich_king_phase1(unit, event)
+	if (unit:GetHealthPct() <= 100) then
+	print("LichKing: Reached Phase 1")
+		unit:RemoveEvents()
+		unit:RegisterEvent("Lich_king_dd", 40000, 0)
+		unit:RegisterEvent("Lich_king_dbolt", 20000, 0)
+		unit:RegisterEvent("Lich_king_dfrost", 15000, 0)
+		unit:RegisterEvent("Lich_king_paled", 1000, 1)
+		unit:RegisterEvent("Lich_king_phase2", 1000, 0)
+	end
+end
+
+function Lich_king_phase2(unit, event)
+	if (unit:GetHealthPct() <= 70) then
+		print("LichKing: Reached Phase 2")
+		unit:SendChatMessage(14, 0, "I was right: You are strong, but not enough!")
+		unit:RemoveEvents()
+		unit:RegisterEvent("Lich_king_dd", 30000, 0)
+		unit:RegisterEvent("Lich_king_dbolt", 20000, 0)
+		unit:RegisterEvent("Lich_king_dfrost", 15000, 0)
+		unit:RegisterEvent("Lich_king_dplague", 8000, 0)
+		unit:RegisterEvent("Lich_king_phase3", 1000, 0)
+	end
+end
+
+function Lich_king_phase3(unit, event)
+	if (unit:GetHealthPct() <= 40) then
+		print("LichKing: Reached Phase 3")
+		unit:SendChatMessage(14, 0, "Hahahaha, prepare to serve me for all eternity!")
+		unit:RemoveEvents()
+		unit:RegisterEvent("Lich_king_dd", 20000, 0)
+		unit:RegisterEvent("Lich_king_dfrost", 15000, 0)
+		unit:RegisterEvent("Lich_king_dplague", 8000, 0)
+		unit:RegisterEvent("Lich_king_dblast", 24000, 0)
+		unit:RegisterEvent("Lich_king_dembrace", 60000, 0)
+		unit:RegisterEvent("Lich_king_phase4", 1000, 0)
+	end
+end
+
+function Lich_king_phase4(unit, event)
+	if (unit:GetHealthPct() <= 5) then
+		print("LichKing: Reached Phase 4")
+		unit:SendChatMessage(14, 0, "This cannot be! I cannot die! I am immortal! Prepare to feel the chill of the Frostmourne.")
+		unit:RemoveEvents()
+		unit:RegisterEvent("Lich_king_dd", 20000, 0)
+		unit:RegisterEvent("Lich_king_dplague", 8000, 0)
+		unit:RegisterEvent("Lich_king_dblast", 16000, 0)
+		unit:RegisterEvent("Lich_king_dembrace", 20000, 0)
+		unit:RegisterEvent("Lich_king_shadowofd", 1000, 1)
+		unit:RegisterEvent("Lich_king_phase5", 1000, 0)
+	end
+end
+
+function Lich_king_phase5(unit, event)
+	if (unit:GetHealthPct() <= 2) then
+		print("LichKing: Reached Death")
+		unit:SendChatMessage(14, 0, "You fools! You did this in vain, I was outnumbered today, but when we will meet again you will beg me to ease your eternal pain!")
+		unit:RemoveEvents()
+		unit:CastSpellAoF(unit:GetX(), unit:GetY(), unit:GetZ(), 3109)
+		unit:SetCombatCapable(1)
+		unit:SetUInt64Value(UNIT_FIELD_FLAGS, UNIT_FLAG_NOT_ATTACKABLE_2)
+		unit:SetDeathState(3)
+		unit:RegisterEvent("Lich_king_postdeath", 2000, 1)
+	end
+end
+
+function Lich_king_postdeath(unit, event)
+	print("LichKing: Reached Post-Death")
+	unit:SpawnCreature(100001, unit:GetX(), unit:GetY(), unit:GetZ(), unit:GetO(), 14, 0)
+	unit:Despawn(0,600000)
+end
+
+function Lich_king_OnTargetDied(unit, event)
+	unit:SendChatMessage(14, 0, "Your soul shall serve me well!")
+	table.insert(ghouls, unit:SpawnCreature(28249, unit:GetX(), unit:GetY(), unit:GetZ(), unit:GetO(), 14, 0))
+end
+
+function Lich_king_wipe(unit, event)
+	unit:SendChatMessage(14, 0, "If this was Azeroth's final stand against The Scourge then this world is totally mine!")
+	for k,i in pairs(ghouls) do
+		unit:FullCastSpellOnTarget(5, i)
+	end
+end
+
+function Lich_king_dd(unit, event)
+	unit:CastSpellAoF(unit:GetX(), unit:GetY(), unit:GetZ(), 39658)
+end
+
+function Lich_king_dbolt(unit, event)
+	unit:FullCastSpellOnTarget(51854, unit:GetRandomPlayer(0))
+end
+
+function Lich_king_dfrost(unit, event)
+	unit:FullCastSpellOnTarget(46629, unit:GetMainTank())
+end
+
+function Lich_king_paled(unit, event)
+	unit:FullCastSpellOnTarget(34626, unit:GetMainTank())
+end
+
+function Lich_king_dplague(unit, event)
+	for i=1, #playerstable do
+		unit:FullCastSpellOnTarget(55645, playerstable[i])
+	end
+end
+
+function Lich_king_dblast(unit, event)
+	playerstable[math.random(1, #playerstable)]:CastSpell(38819)
+end
+
+function Lich_king_dembrace(unit, event)
+	unit:CastSpell(53635)
+end
+
+function Lich_king_shadowofd(unit, event)
+	unit:FullCastSpellOnTarget(40251, unit:GetMainTank())
+end
+
+RegisterUnitEvent(100000, 1, "Lich_king_OnCombat")
+RegisterUnitEvent(100000, 2, "Lich_king_wipe")
+RegisterUnitEvent(100000, 3, "Lich_king_OnTargetDied")

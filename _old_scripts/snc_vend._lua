@@ -1,0 +1,75 @@
+local V_ENTRY = 24437 --vendor entry
+local LSHARD_ENTRY = 11084 --lesser shard
+local GSHARD_ENTRY = 74771 --greater shard
+local CRYSTL_ENTRY = 43102 --crystal
+--we'll use a sweet vendor window for items that cost gold - hence no table for that menu.
+local menu2_items = 
+{
+["Greater Shard of the World"] = GSHARD_ENTRY
+}
+
+local menu3_items = 
+{
+["Crystal of the World"] = CRYSTL_ENTRY
+}
+
+local menu4_items = 
+{
+["Sword of a Thousand Truths"] = 12811,
+["Cartman's Helm"] = 17771
+}
+
+local COSTS = 
+{
+[74771] = {LSHARD_ENTRY,20}, --have to use direct numbers in the keys, sorry
+[43102] = {GSHARD_ENTRY,20},
+[12811] = {CRYSTL_ENTRY, 1},
+[17771] = {CRYSTL_ENTRY, 1}
+}
+
+function ShowMenuFromTable(pUnit, player, table, npc_text)
+	pUnit:GossipCreateMenu(npc_text, player, 0)
+	for k,v in pairs(table) do
+		pUnit:GossipMenuAddItem(1, k.." ["..COSTS[v][2].." item(s)]", v, 0)
+	end
+	pUnit:GossipMenuAddItem(0, "[Main Menu]", 5, 0)
+	pUnit:GossipSendMenu(player)
+end
+
+function SNC_Vendor_OnGossipTalk(pUnit, event, player)
+	pUnit:GossipCreateMenu(V_ENTRY, player, 0)
+	pUnit:GossipMenuAddItem(6, "Purchase items using gold", 1, 0)
+	pUnit:GossipMenuAddItem(1, "Purchase items using Lesser Shards of the World", 2, 0)
+	pUnit:GossipMenuAddItem(1, "Purchase items using Greater Shards of the World", 3, 0)
+	pUnit:GossipMenuAddItem(1, "Purchase items using Crystals of the World", 4, 0)
+	pUnit:GossipMenuAddItem(0, "[Exit Exchange]", 6, 0)
+	pUnit:GossipSendMenu(player)
+end
+
+function SNC_Vendor_OnGossipSelect(pUnit, event, player, id, intid, code)
+	if (intid == 1) then
+		player:SendVendorWindow(pUnit) --make pUnit's vendor table hold items that cost gold.
+	elseif (intid == 2) then
+		ShowMenuFromTable(pUnit, player, menu2_items, V_ENTRY+1) --V_ENTRY+1 refers to npc_text database table values.
+	elseif (intid == 3) then
+		ShowMenuFromTable(pUnit, player, menu3_items, V_ENTRY+2)
+	elseif (intid == 4) then
+		ShowMenuFromTable(pUnit, player, menu4_items, V_ENTRY+3)
+	elseif (intid == 5) then
+		SNC_Vendor_OnGossipTalk(pUnit, event, player) --back to main menu
+	elseif (intid == 6) then
+		player:GossipComplete()
+	else
+		if (player:GetItemCount(COSTS[intid][1]) < COSTS[intid][2]) then
+			player:SendAreaTriggerMessage("You do not have enough of the required item.")
+			pUnit:GossipSendMenu(player)
+		else
+			player:AddItem(intid, 1)
+			player:RemoveItem(COSTS[intid][1], COSTS[intid][2])
+			pUnit:GossipSendMenu(player) --this makes it so you don't need GossipComplete! Can't believe I worked that out.
+		end
+	end
+end
+
+RegisterUnitGossipEvent(V_ENTRY, 1, "SNC_Vendor_OnGossipTalk")
+RegisterUnitGossipEvent(V_ENTRY, 2, "SNC_Vendor_OnGossipSelect")

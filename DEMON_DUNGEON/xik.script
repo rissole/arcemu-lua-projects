@@ -1,0 +1,51 @@
+-----------------------
+--Made by Hypersniper--
+-----Project Ronin-----
+-----------------------
+
+local mod = getfenv(1)
+assert(type(mod) == "table", "RONIN_DUNGEON: Critical error, parent module missing!")
+module(mod._NAME..".XIK", package.seeall)
+local self = getfenv(1)
+
+local entry = 81101
+local res = WorldDBQuery("SELECT position_x,position_y,position_z,orientation FROM creature_spawns WHERE entry = '"..entry.."'")
+assert(res, "Xik script: did not load; Xik not spawned.")
+local m_realSpawnCoords = {res:GetColumn(0):GetLong(), res:GetColumn(1):GetLong(), res:GetColumn(2):GetLong(), res:GetColumn(3):GetLong()}
+
+function OnSpawn(pUnit)
+   pUnit:SetAIState(0)
+   pUnit:SetUInt32Value(mod.UNIT_FIELD_FLAGS, mod.UNIT_FLAG_NOT_SELECTABLE)
+   pUnit:SetMovementType(4)
+   pUnit:RegisterEvent(FindPlayer, 500, 0)
+   pUnit:RegisterEvent(RealOnSpawn, 200, 1)
+end
+
+function RealOnSpawn(pUnit)
+   pUnit:SetPosition(unpack(m_realSpawnCoords))
+   pUnit:SetFacing(m_realSpawnCoords[4])
+end
+
+function FindPlayer(pUnit)
+   for k,v in pairs(pUnit:GetInRangePlayers()) do
+      if (pUnit:GetDistanceYards(v) <= 20) then
+         if (pUnit:IsInFront(v)) then
+            pUnit:SendChatMessage(12, 0, "Master Sirrah! MASTER SIRRAH! Someone's gotten inside! Someone's gotten inside!!!")
+            pUnit:RemoveEvents()
+            pUnit:SetMovementType(2)
+         else --some guy coming from behind (just despawn for 2 mins)
+            pUnit:Despawn(0, 120000)
+         end
+         break
+      end
+   end
+end
+
+function OnReachWP(pUnit, event, id, bForwards)
+  if (id == pUnit:GetNumWaypoints()) then
+      pUnit:Despawn(0, 300000)
+   end
+end
+
+RegisterUnitEvent(entry, 18, OnSpawn)
+RegisterUnitEvent(entry, 19, OnReachWP)

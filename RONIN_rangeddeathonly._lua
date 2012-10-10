@@ -1,0 +1,21 @@
+-----------------------
+--Made by Hypersniper--
+-----Project Ronin-----
+-----------------------
+
+local nRangers = {1337,1338} --entry(s) here
+
+local function IsRanger(entry)
+   for k,v in pairs(nRangers) do
+      if (v == entry) then return true; end
+   end
+   return false
+end
+
+local function PreUnitDie(event, pKiller, pVictim)
+   if (isRanger(pVictim:GetEntry()) and pVictim:GetDistanceYards(pKiller) <= 5) then
+      return 0
+   end
+end
+
+RegisterServerHook(28, PreUnitDie)

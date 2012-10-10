@@ -1,0 +1,61 @@
+-----------------------
+--Made by Hypersniper--
+----Duel Creatures-----
+-----------------------
+
+--External scripts manager.
+
+local par = getfenv(1)
+assert(type(par) == "table", "DuelCreatures: Critical error, parent module missing!")
+module(par._NAME..".SCRIPTMGR", package.seeall)
+local self = getfenv(1)
+setmetatable(self, {__index = par.SHARED})
+
+--SCRIPTS[event][dcid] = func
+SCRIPTS = {}
+
+function RegisterCardEvent(dcid, event, func, triggersForWho)
+   if (type(event) == "number") then
+      assert(DC_DB_CACHE[dcid] and EVENTS[event] and type(func) == "function", "RegisterCardEvent error: invalid dcid/event/function")
+      assert(triggersForWho == nil or triggersForWho == "self" or triggersForWho == "any", "RegisterCardEvent error: invalid trggiersForWho argument")
+      if (triggersForWho == nil) then triggersForWho = "self"; end
+      SCRIPTS[event] = SCRIPTS[event] or {}
+      if (type(SCRIPTS[event][dcid]) == "function") then
+         error(string.format("event %d already registered for creature #%d", event, dcid))
+      end
+      SCRIPTS[event][dcid] = {func, triggersForWho}
+   elseif (type(event) == "table") then --list of events
+      for k,v in pairs(event) do
+         assert(DC_DB_CACHE[dcid] and CARD_EVENTS[v] and type(func) == "function", "RegisterCardEvent error: invalid dcid/event/function")
+         SCRIPTS[v] = SCRIPTS[v] or {}
+         if (type(SCRIPTS[v][dcid]) == "function") then
+            error(string.format("event %d already registered for creature #%d", v, dcid))
+         end
+         SCRIPTS[v][dcid] = {func, triggersForWho}
+      end
+   end
+end
+
+function LoadCardScripts()
+   local script_names = dofile("scripts/DuelCreatures/cardscripts/DC_CardScripts.script")
+   assert(type(script_names) == "table", "Error loading card scripts, no script names table")
+   for i,v in ipairs(script_names) do
+      local res, err = loadfile("scripts/DuelCreatures/cardscripts/"..v)
+      if (not res) then
+         print(err)
+      else
+         setfenv(res, self)
+         local res, err = pcall(res)
+         if (not res) then print(err); end
+      end
+   end
+end
+
+function DefaultHandleEvent(event, dcid, index, nConsole, ...)
+   if (event == EVENTS.PRE_SUMMON) then
+      local slot, mode = arg[1], arg[2]
+      CONSOLES[index][nConsole][8]["NS"] = true --we've done our normal summon.
+      SummonMonsterFromHand(index, nConsole, slot, dcid, mode)
+      return MainMenu(index, nConsole)
+   end
+end

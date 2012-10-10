@@ -1,0 +1,8 @@
+﻿## Interface: 33000
+## Title: AggroYards
+## Notes: Shows the approximate distance at which the targetted mob will attack you.
+## Author: Hypersniper
+## Version: 1.0
+## X-eMail: hypersniper@ymail.com
+xml.xml
+lua.lua

@@ -1,0 +1,369 @@
+-----------------------
+--Made by Hypersniper--
+-----Project Ronin-----
+-----------------------
+
+local mod = getfenv(1)
+assert(type(mod) == "table", "RONIN_DUNGEON: Critical error, parent module missing!")
+module(mod._NAME..".PRISONBREAK", package.seeall)
+local self = getfenv(1)
+
+local doc = 20
+local lila = 23
+local BGuard = 21
+local BMinion = 22
+local lila_quest = 8
+local lila_quest_prereq = 6
+local cage_entry = 195
+
+local hiding_location = {941.63, 552.50, 235.42, 0}
+local doc_spawn = {948.87, 529.80, 235.12, 2.62}
+local doc_coords = { {937.51, 539.77, 233.56, 1.50}, {938.99, 546.92, 235.56, 0.71}, {932.60, 542.82, 233.70, 3.67} }
+local lila_exit_path = { {935.85, 542.09, 233.69, 5.40}, {942.66, 534.04, 234.20, 5.42} }
+
+function DistToPoint(x,y,z,o,x2,y2,z2,o2)
+   local posTar = {x, y, z}
+   local posNow = {x2, y2, z2}
+   local distance = 0
+   for i,v in ipairs(posNow) do
+      distance = distance + (v-posTar[i])^2
+   end
+   return math.sqrt(distance) --yards
+end
+
+function TimeToPoint(x,y,z,o,x2,y2,z2,o2,speed)
+   local dist = DistToPoint(x,y,z,o,x2,y2,z2,o2)
+   return math.floor((dist / speed) * 1000)
+end
+
+function MarkQuestFailed(player, questID)
+   local p = LuaPacket:CreatePacket(406, 4) --SMSG_QUESTUPDATE_FAILED
+   p:WriteULong(questID)
+   player:SendPacketToPlayer(p)
+   local slot = player:GetQuestLogSlot(questID) --get quest slot
+   if (slot == -1) then return; end
+   local field = 158 + slot * 5 + 1
+   player:SetUInt32Value(field, 0x02)
+end
+
+function SendQuestComplete(player, questID)
+   player:FinishQuest(questID)
+   player:AddItem(20982, 1)
+end
+
+function Lila_OnSpawn(pUnit)
+   pUnit:RegisterEvent(FindPlayer, 500, 0)
+end
+
+function FindPlayer(pUnit)
+   for k,v in pairs(pUnit:GetInRangePlayers()) do
+      if (pUnit:GetDistanceYards(v) <= 12.6) then
+         pUnit:RemoveEvents()
+         pUnit:SendChatMessage(12, 0, "Hey! You! You're real, right?")
+         break
+      end
+   end
+end
+
+function OnQuestAccept(event, player, id, pUnit) --pUnit is lila
+   if (id == lila_quest and pUnit) then
+      pUnit:SendChatMessage(12, 0, "Look around for him --- wait! Someone's coming! Quick! Hide in the corner behind this cage!")
+      local pPlayers = {} --participating players, all within the room have to participate
+      for k,v in pairs(pUnit:GetInRangePlayers()) do
+         if (pUnit:GetDistanceYards(v) <= 12.6) then
+            table.insert(pPlayers, v)
+            if (tostring(player) ~= tostring(v) and player:IsInGroup() and player:IsGroupedWith(v) and v:HasFinishedQuest(lila_quest_prereq)) then
+               v:StartQuest(lila_quest)
+            end
+         end
+      end
+      self[tostring(pUnit)] = { hasTalked = {} }
+      self[tostring(pUnit)].pPlayers = pPlayers
+      SetDBCSpellVar(6920, "AuraInterruptFlags", 0)
+      SetDBCSpellVar(6920, "c_is_flags", 0x1000)
+      pUnit:RegisterEvent(mod.CreateClosure(SetHidden, pPlayers), 200, 0)
+      pUnit:RegisterEvent(mod.CreateClosure(CheckHidden, pPlayers), 5000, 1)
+   end
+end
+
+function SetHidden(pUnit, pPlayers)
+   for k,v in pairs(pPlayers) do
+      if (v and v:IsInWorld()) then
+         if (DistToPoint(v:GetX(), v:GetY(), v:GetZ(), 0, unpack(hiding_location)) <= 2.3) then
+            if (v:HasAura(6920) == false) then
+               v:CastSpell(6920) --hide!
+            end
+            if (self[tostring(pUnit)].hasTalked[k] == nil) then
+               pUnit:SendChatMessageToPlayer(15, 0, "Stay there and don't move or make a sound. When he's got his back turned, jump out and take care of him, ok?", v)
+               self[tostring(pUnit)].hasTalked[k] = true
+            end
+         else
+            local ss = v:GetByteValue(122, 3) --get shapeshift
+            v:RemoveAura(6920) --ur not hidden anymore.
+            v:SetByteValue(122, 3, ss)
+         end
+      end
+   end
+end
+
+function CheckHidden(pUnit, pPlayers)
+   local allHidden = true
+   for k,v in pairs(pPlayers) do
+      if (v and v:IsInWorld()) then
+         if (not v:HasAura(6920)) then
+            allHidden = false
+            break
+         end
+      end
+   end
+   local pDoc = pUnit:SpawnCreature(doc, doc_spawn[1], doc_spawn[2], doc_spawn[3], doc_spawn[4], 7, 0)
+   pDoc:SetCombatCapable(1)
+   self[tostring(pDoc)] = { canBeKilled = false }
+   pDoc:RegisterEvent(mod.CreateClosure(Doc_Walk, allHidden, pPlayers), 100, 1)
+end
+
+function Doc_Walk(pUnit, bHidden, pPlayers)
+   pUnit:SetCombatCapable(1)
+   pUnit:SetMovementFlags(0)
+   if (bHidden == true) then
+      local x1,y1,z1,o1 = pUnit:GetLocation()
+      local x,y,z,o = unpack(doc_coords[1])
+      pUnit:RegisterEvent(Doc_Walk2, TimeToPoint(x1,y1,z1,o1, x, y, z, o, 2.5), 1)
+      pUnit:RegisterEvent(mod.CreateClosure(Doc_CheckHidden, pPlayers), 200, 0)
+   else
+      local x1,y1,z1,o1 = pUnit:GetLocation()
+      local x,y,z,o = unpack(doc_coords[1])
+      pUnit:RegisterEvent(mod.CreateClosure(Doc_EndSequence, pPlayers), TimeToPoint(x1,y1,z1,o1, x, y, z, o, 2.5), 1)
+   end
+   pUnit:MoveTo(unpack(doc_coords[1]))
+end
+
+function Doc_EndSequence(pUnit, pPlayers)
+   local pLila = mod.GetCreatureInRange(pUnit, lila)
+   for k,v in pairs(pPlayers) do
+      if (v and v:IsInWorld()) then
+         MarkQuestFailed(v, lila_quest)
+         local ss = v:GetByteValue(122, 3) --get shapeshift
+         v:RemoveAura(6920) --ur not hidden anymore.
+         v:SetByteValue(122, 3, ss)
+      end
+   end
+   pUnit:RemoveEvents()
+   pLila:RemoveEvents()
+   pUnit:SendChatMessage(12, 0, "INTRUDER! Guards! Guards!")
+   pUnit:CastSpell(64505) --dark shield
+   pUnit:SetMovementFlags(1)
+   local x,y,z,o = unpack(doc_spawn)
+   local x1,y1,z1,o1 = pUnit:GetLocation()
+   pUnit:RegisterEvent(Doc_RunAndDespawn, TimeToPoint(x1,y1,z1,o1, x,y,z,o, 7)+500, 1)
+   for i=1,3 do
+      local u = pUnit:SpawnCreature(BMinion, x,y,z,o, 73, 0)
+      u:CastSpell(31901) --demonic shield
+      u:MoveTo(x1,y1,z1,o1)
+      u:RegisterEvent(mod.CreateClosure(Ending_Aggro, pPlayers), TimeToPoint(x1,y1,z1,o1, x,y,z,o, 7), 1)
+   end
+   for i=1,2 do
+      local u = pUnit:SpawnCreature(BGuard, x,y,z,o, 73, 0)
+      u:CastSpell(31901)
+      u:MoveTo(x1,y1,z1,o1)
+      u:RegisterEvent(mod.CreateClosure(Ending_Aggro, pPlayers), TimeToPoint(x1,y1,z1,o1, x,y,z,o, 7), 1)
+   end
+   pUnit:MoveTo(unpack(doc_spawn))
+end
+
+function Doc_RunAndDespawn(pUnit)
+   pUnit:Despawn(5, 0)
+end
+
+function Ending_Aggro(pUnit, pPlayers)
+   for k,v in pairs(pPlayers) do
+      if (v and v:IsInWorld()) then
+         pUnit:AttackReaction(v, k, 0)
+      end
+   end
+end
+
+function Brutals_OnCombat(pUnit)
+   pUnit:RegisterEvent(mod.CreateClosure(Brutals_Spell, 40845, "self"), 1000, 0)
+   pUnit:RegisterEvent(mod.CreateClosure(Brutals_Spell, 58460, "mt"), 3000, 0)
+end
+
+function Brutals_Spell(pUnit, spell, tar)
+   if (tar == "self") then
+      pUnit:CastSpell(spell)
+   elseif (tar == "mt") then
+      pUnit:CastSpellOnTarget(spell, pUnit:GetMainTank())
+   end
+end
+
+function Brutals_Reset(pUnit, event)
+   pUnit:RemoveEvents()
+   if (event == 2) then --leave combat
+      pUnit:Despawn(5, 0)
+      local pLila = mod.GetCreatureInRange(pUnit, lila)
+      local pDoc = mod.GetCreatureInRange(pUnit, doc)
+      self[tostring(pLila)] = nil
+      self[tostring(pDoc)] = nil
+   end
+end
+
+function Doc_Walk2(pUnit)
+   local x1,y1,z1,o1 = pUnit:GetLocation()
+   local x,y,z,o = unpack(doc_coords[2])
+   pUnit:RegisterEvent(Doc_Walk3, TimeToPoint(x1,y1,z1,o1, x,y,z,o, 2.5), 1)
+   pUnit:MoveTo(unpack(doc_coords[2]))
+end
+
+function Doc_Walk3(pUnit)
+   pUnit:SetFacing(0.71)
+   pUnit:SendChatMessage(12, 0, "Well hello again my little lab rat, there are some experiments I've been meaning to try on you!")
+   pUnit:RegisterEvent(mod.CreateClosure(Doc_Chatto, "Say, you aren't allergic to extremely pointy things are you? Hm?"), 3000, 1)
+   pUnit:RegisterEvent(mod.CreateClosure(Doc_Chatto, "How about corrosive acids?"), 6000, 1)
+   pUnit:RegisterEvent(mod.CreateClosure(Doc_Chatto, "Well I suppose I'll see for myself shortly."), 9000, 1)
+   pUnit:RegisterEvent(Doc_Walk3a, 9000, 1)
+end
+
+function Doc_Walk3a(pUnit)
+   pUnit:RemoveEvents()
+   local pLila = mod.GetCreatureInRange(pUnit, lila)
+   pUnit:RegisterEvent(mod.CreateClosure(Doc_CheckInFront, self[tostring(pLila)].pPlayers), 200, 0)
+   local x1,y1,z1,o1 = pUnit:GetLocation()
+   local x,y,z,o = unpack(doc_coords[3])
+   pUnit:RegisterEvent(Doc_Walk4, TimeToPoint(x1,y1,z1,o1,  x,y,z,o, 2.5), 1)
+   pUnit:MoveTo(unpack(doc_coords[3]))
+end
+
+function Doc_Walk4(pUnit)
+   pUnit:SendChatMessage(16, 0, pUnit:GetName().." sifts through some papers on his desk.")
+   pUnit:Emote(69, 18000) --"working" emote
+   local pLila = mod.GetCreatureInRange(pUnit, lila)
+   for k,v in pairs(self[tostring(pLila)].pPlayers) do
+      pLila:SendChatMessageToPlayer(15, 0, "He's not looking! Now's your chance!", v)
+   end
+   self[tostring(pUnit)].canBeKilled = true
+   pUnit:RegisterEvent(Doc_Expire1, 15000, 1)
+end
+
+function Doc_CheckInFront(pUnit, pPlayers)
+   for k,v in pairs(pPlayers) do
+      if (pUnit:IsInFront(v) and self[tostring(pUnit)].canBeKilled) then
+         pUnit:RemoveEvents()
+         pUnit:RegisterEvent(mod.CreateClosure(Doc_EndSequence, pPlayers), 100, 1)
+      end
+   end
+end
+
+function Doc_CheckHidden(pUnit, pPlayers)
+   for k,v in pairs(pPlayers) do
+      if (not v:HasAura(6920)) then
+         pUnit:RemoveEvents()
+         pUnit:RegisterEvent(mod.CreateClosure(Doc_EndSequence, pPlayers), 100, 1)
+      end
+   end
+end
+
+function Doc_Expire1(pUnit)
+   self[tostring(pUnit)].canBeKilled = false
+   pUnit:SendChatMessage(12, 0, "Now where did I put that... scalpel...")
+   pUnit:RegisterEvent(mod.CreateClosure(Doc_Chatto, "AH! Here it is! Right on my belt where I left it."), 3000, 1)
+   pUnit:RegisterEvent(mod.CreateClosure(Doc_Chatto, "I swear, I'd lose my own head if it wasn't stuck on my shoulders..."), 6000, 1)
+   pUnit:RegisterEvent(Doc_Expire2, 9000, 1)
+end
+
+function Doc_Chatto(pUnit, msg)
+   pUnit:Emote(1, 1500)
+   pUnit:SendChatMessage(12, 0, msg)
+end
+
+function Doc_Expire2(pUnit)
+   pUnit:SendChatMessage(12, 0, "But you... you won't be keeping your head much longer.")
+   local x,y,z,o = unpack(doc_coords[2])
+   local x1,y1,z1,o1 = pUnit:GetLocation()
+   local t = TimeToPoint(x1,y1,z1,o1, x,y,z,o, 2.5)+1000
+   pUnit:RegisterEvent(mod.CreateClosure(Doc_Chatto, "Now just hold still. Either way it's going to hurt, squirming will only make it worse!"), t, 1)
+   pUnit:RegisterEvent(Doc_Expire3, t+3000, 1)
+   pUnit:MoveTo(unpack(doc_coords[2]))
+end
+
+function Doc_Expire3(pUnit)
+   pUnit:PlaySpellVisual(pUnit:GetGUID(), 0x54) --special attack anim on doc
+   local pLila = mod.GetCreatureInRange(pUnit, lila)
+   pUnit:PlaySpellVisual(pLila:GetGUID(), 0x212) --blood spray on lila
+   pUnit:Kill(pLila)
+   pUnit:RegisterEvent(mod.CreateClosure(Doc_EndSequence, self[tostring(pLila)].pPlayers), 1000, 1)
+end
+
+function Doc_OnTakeDamage(pUnit)
+   if (self[tostring(pUnit)].canBeKilled) then
+      self[tostring(pUnit)].canBeKilled = false
+      pUnit:SetCombatCapable(0)
+      pUnit:RemoveEvents()
+      pUnit:SetUInt32Value(83, 0) --UNIT_NPC_EMOTESTATE
+      pUnit:SendChatMessage(12, 0, "What? Who?---")
+      local pLila = mod.GetCreatureInRange(pUnit, lila)
+      pLila:RemoveEvents()
+      for k,v in pairs(self[tostring(pLila)].pPlayers) do
+         if (v and v:IsInWorld()) then
+           local ss = v:GetByteValue(122, 3) --get shapeshift
+           v:RemoveAura(6920) --ur not hidden anymore.
+           v:SetByteValue(122, 3, ss)
+         end
+      end
+   end
+end
+
+function Doc_Reset(pUnit)
+   self[tostring(pUnit)] = nil
+   pUnit:RemoveEvents()
+   if (event == 2) then pUnit:Despawn(5, 0); end
+end
+
+function OnQuestComplete(player, id)
+   local pUnit = mod.GetCreatureInRange(player, lila)
+   for k,v in pairs(self[tostring(pUnit)].pPlayers) do
+      if (v and v:IsInWorld() and tostring(v) ~= tostring(player)) then
+         SendQuestComplete(v, id)
+      end
+   end
+   local x,y,z = pUnit:GetLocation()
+   local go = pUnit:GetGameObjectNearestCoords(x,y,z,cage_entry)
+   go:SetByte(17, 0, 0) --GAMEOBJECT_BYTES_1
+   pUnit:Emote(2, 1500)
+   pUnit:SendChatMessage(12, 0, "Thank you, "..player:GetName()..". Your kindness will not go unnoted.")
+   pUnit:RegisterEvent(mod.CreateClosure(Lila_ExitPath, 1), 3000, 1)
+end
+
+function Lila_ExitPath(pUnit, destNode)
+   if (destNode <= #lila_exit_path) then
+      local x,y,z,o = unpack(lila_exit_path[destNode])
+      local x1,y1,z1,o1 = pUnit:GetLocation()
+      local t = TimeToPoint(x1,y1,z1,o1, x,y,z,o, 2.5)
+      pUnit:RegisterEvent(mod.CreateClosure(Lila_ExitPath, destNode+1), t, 1)
+      pUnit:MoveTo(unpack(lila_exit_path[destNode]))
+   end
+   if (destNode == 2) then
+      local x,y,z = pUnit:GetLocation()
+      local go = pUnit:GetGameObjectNearestCoords(x,y,z,cage_entry)
+      go:SetByte(17, 0, 1) --GAMEOBJECT_BYTES_1
+      pUnit:CastSpell(59045) --camoflage
+   elseif (destNode == 3) then
+      pUnit:Despawn(5, 60000)
+   end
+end
+
+function empty()
+   return
+end
+
+RegisterUnitEvent(doc, 23, Doc_OnTakeDamage)
+RegisterUnitEvent(doc, 2, Doc_Reset)
+RegisterUnitEvent(doc, 4, Doc_Reset)
+RegisterUnitEvent(lila, 18, Lila_OnSpawn)
+RegisterServerHook(14, OnQuestAccept)
+RegisterQuestEvent(lila_quest, 2, OnQuestComplete)
+RegisterUnitEvent(BGuard, 1, Brutals_OnCombat)
+RegisterUnitEvent(BMinion, 1, Brutals_OnCombat)
+RegisterUnitEvent(BGuard, 2, Brutals_Reset)
+RegisterUnitEvent(BMinion, 2, Brutals_Reset)
+RegisterUnitEvent(BGuard, 4, Brutals_Reset)
+RegisterUnitEvent(BMinion, 4, Brutals_Reset)

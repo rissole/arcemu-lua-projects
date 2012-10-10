@@ -1,0 +1,15 @@
+function CSOT_load(pUnit)
+	pUnit:Root()
+	pUnit:SetCombatCapable(1)
+	--pUnit:SetUInt64Value(UNIT_FIELD_FLAGS, UNIT_FLAG_NOT_SELECTABLE)
+	pUnit:RegisterEvent("CSOT_phase1", 1000, 0)
+	local player = pUnit:GetRandomPlayer(0)
+	player:ChannelSpell(45537, pUnit)
+end
+
+function CSOT_phase1(pUnit)
+	
+	
+end
+
+RegisterUnitEvent(800013, 18, "CSOT_load")

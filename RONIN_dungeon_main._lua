@@ -1,0 +1,58 @@
+-----------------------
+--Made by Hypersniper--
+-----Project Ronin-----
+-----------------------
+function OnItemUse(item, event, player)
+   if (player:GetDisplay() ~= 14380) then
+      player:SetModel(14380) --gasp you're xik now
+      player:SetFaction(35)
+      player:AddAura(32756, 900000, true) --"shadowy disguise", 15 min
+      local aura = player:GetAuraObjectById(32756)
+      aura:SetVar("AuraInterruptFlags", bit_or(0x2,0x1000,0x8000))
+   end
+end
+module("DEMON_DUNGEON", package.seeall)
+print("Demon Dungeon Loader:")
+
+--SHARED VARS
+OBJECT_END = 0x0006
+UNIT_NPC_FLAGS = OBJECT_END + 0x004C
+UNIT_FIELD_FLAGS = OBJECT_END + 0x0035
+UNIT_DYNAMIC_FLAGS = 78
+U_DYN_FLAG_DEAD = 32
+UNIT_FLAG_NOT_ATTACKABLE_2 = 0x02
+UNIT_FLAG_NOT_SELECTABLE = 0x2000000
+
+function CreateClosure(method, ...)
+   local args = arg
+   local closure = function(...) return method(unpack(arg), unpack(args)) end
+   return closure
+end
+
+function GetCreatureInRange(pUnit, entry)
+   for _,v in pairs(pUnit:GetInRangeUnits()) do
+      if (v:GetEntry() == entry) then
+         return v
+      end
+   end
+   return nil
+end
+--END SHARED VARS
+
+local mod = getfenv(1)
+local directory = "scripts/DEMON_DUNGEON/"
+local modules = { "xik.script", "vurk.script", "guardhouse.script", "prisonbreak.script", "felhounds.script", "clever_ruse.script" }
+for _,v in pairs(modules) do
+   local loader_function, errormsg = loadfile(directory..v)
+   if (loader_function == nil) then
+      print(errormsg)
+   else
+      setfenv(loader_function, mod)
+      local ret, errormsg = pcall(loader_function)
+      if (ret == false) then
+         print(errormsg)
+      else
+         print(string.format("Successfully loaded script file: \"%s\"", v))
+      end
+   end
+end

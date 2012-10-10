@@ -1,0 +1,71 @@
+-----------------------
+--Made by Hypersniper--
+-------wow-v.com-------
+--For Burning Heavens--
+-----------------------
+
+BUG_REPORTER = {}
+
+-----CONFIG-----
+
+ BUG_REPORTER.id = 74772 --item id here
+ BUG_REPORTER.mainTextId = 61000 --main menu text id
+ BUG_REPORTER.Categories = { --maximum of 15 categories
+    "Spell",
+    "Profession",
+    "Creature",
+    "Game Object",
+    "Item",
+    "Quest",
+    "Other"
+ }
+ BUG_REPORTER.categTextId = { --in same order as Categories, the text ids that appears when they choose said category.
+    61001,
+    61002,
+    61003,
+    61004,
+    61005,
+    61006,
+    61007
+ }
+
+---END CONFIG---
+
+local function mysql_real_escape_string(str)
+   str = str:gsub("\x00", "\\x00")
+   str = str:gsub("\n", "\\n")
+   str = str:gsub("\r", "\\r")
+   str = str:gsub("\\", "\\\\")
+   str = str:gsub("\x1a", "\\x1a")
+   return str
+end
+
+function BUG_REPORTER.OnUse(item, event, player)
+   item:GossipCreateMenu(BUG_REPORTER.mainTextId, player, 0)
+   for i=1, #(BUG_REPORTER.Categories) do
+      item:GossipMenuAddItem(4, BUG_REPORTER.Categories[i], i, 0)
+   end
+   item:GossipSendMenu(player)
+end
+
+function BUG_REPORTER.OnSel(item, event, player, id, intid, code)
+
+   if (intid <= 15) then --main menu selection
+      item:GossipCreateMenu(BUG_REPORTER.categTextId[intid], player, 0)
+      item:GossipMenuAddItem(4, "Report Bug", 20+intid, 1)
+      item:GossipMenuAddItem(4, "Main Menu", 16, 0)
+      item:GossipSendMenu(player)
+   elseif (intid == 16) then --main menu
+      BUG_REPORTER.OnUse(item, event, player)
+   elseif (intid > 20) then --report bug
+      local timestamp = os.date("%Y-%m-%d %H:%M:%S")
+      code = mysql_real_escape_string(code)
+      CharDBQuery("INSERT INTO bugtracker (Category, Name, Timestamp, Comment) VALUES ('"..BUG_REPORTER.Categories[intid-20].."', '"..player:GetName().."', '"..timestamp.."', '"..code.."')")
+      player:GossipComplete()
+      player:SendAreaTriggerMessage("Bug report sent!")
+      player:SendBroadcastMessage("Bug report sent!")
+   end
+end
+
+RegisterItemGossipEvent(BUG_REPORTER.id, 1, "BUG_REPORTER.OnUse")
+RegisterItemGossipEvent(BUG_REPORTER.id, 2, "BUG_REPORTER.OnSel")

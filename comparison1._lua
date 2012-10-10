@@ -1,0 +1,24 @@
+local mage1
+local mage2
+
+function Mage1_OnSpawn(pUnit, event)
+   mage1 = pUnit
+end
+
+function Mage2_OnSpawn(pUnit, event)
+   mage2 = pUnit
+end
+
+function Mage1_OnCombat(pUnit, event)
+   pUnit:RegisterEvent("Mage1_Check_Mage2_HP", 1000, 0)
+end
+
+function Mage1_Check_Mage2_HP(pUnit, event)
+   if (mage2:GetHealthPct() < 20) then
+      pUnit:SendChatMessage(14, 0, "No! My brother is in danger!")
+   end
+end
+
+RegisterUnitEvent(750, 18, "Mage1_OnSpawn")
+RegisterUnitEvent(750, 1,  "Mage1_OnCombat")
+RegisterUnitEvent(751, 18, "Mage2_OnSpawn")

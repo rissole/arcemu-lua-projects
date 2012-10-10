@@ -1,0 +1,59 @@
+local function _DistToPoint(x,y,z,x2,y2,z2)
+   local posTar = {x, y, z}
+   local posNow = {x2, y2, z2}
+   local distance = 0
+   for i,v in ipairs(posNow) do
+      distance = distance + (v-posTar[i])^2
+   end
+   return math.sqrt(distance) --yards
+end
+
+local function _TimeToPoint(x,y,z,x2,y2,z2,speed)
+   local dist = _DistToPoint(x,y,z,x2,y2,z2)
+   return math.floor((dist / speed) * 1000)-400
+   --we take off 400ms here - it makes the movement look smoother for circles.
+end
+
+local speed = 3 --their movement speed
+local corners = 15 --number of 'corners' on the circle. 15 is a good number.
+local ox, oy = -13201, 272 --centre of circle here.
+local radius = 5 --how far away from the boss they are
+local entry = 1 --orb entry id
+
+function SpawnCircles(pUnit)
+   local ang1 = math.pi --initial angle
+   local ang2 = 0 --this will make them on opp sides of circle
+   local x = ox + radius * math.cos(ang1)
+   local y = oy + radius * math.sin(ang1)
+   local z = pUnit:GetZ()
+
+   local u = pUnit:SpawnCreature(entry,x,y,z,0,35,0)
+   u:TeleportCreature(x,y,z,0) --put them in their initial postion
+
+   local x = ox + radius * math.cos(ang2)
+   local y = oy + radius * math.sin(ang2)
+   local z = pUnit:GetZ()
+
+   local u2 = pUnit:SpawnCreature(entry,x,y,z,0,35,0)
+   u2:TeleportCreature(x,y,z,0) --put them in their initial postion
+
+   u:ModifyRunSpeed(speed)
+   u2:ModifyRunSpeed(speed)
+   DoWalk(u, ang1)
+   DoWalk(u2, ang2)
+   --enter your beam channel visual code here
+end
+
+function DoWalk(pUnit, lastAng)
+   local ang = lastAng + ((2 * math.pi) / corners)
+   local x1, y1, z1 = pUnit:GetLocation()
+   local x2 = ox + radius * math.cos(ang)
+   local y2 = oy + radius * math.sin(ang)
+   local z2 = pUnit:GetZ() --z will always be the same on flat ground
+   local t = _TimeToPoint(x1,y1,z1,x2,y2,z2,speed)
+   pUnit:MoveTo(x2,y2,z2,0)
+   pUnit:CreateLuaEvent(function() DoWalk(pUnit, ang) end, t, 1)
+end
+
+RegisterUnitEvent(entry, 18, function() return end)
+--CreateLuaEvent needs at least 1 unit event registered to work which is why we do this :P

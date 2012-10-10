@@ -1,0 +1,431 @@
+-----------------------
+--Made by Hypersniper--
+-----Project Ronin-----
+-----------------------
+local RONIN_TAXIS = {}
+-------------------
+--START MODIFYING--
+-------------------
+
+local TAXI_MASTERS = --enter entry IDs of Taxi Masters here
+{
+   349,
+   223,
+   149,
+   230
+}
+
+local TOWNS = { --[area_id] = {name, {area,ids,visitable}, mount_spell_id }
+   [69] = {"Lakeshire", {999}, 6648 },
+   [999] = {"Stonewatch Tower", {}, 6648 },
+   [2358] = {"Forest Song", {415}, 6648 },
+   [413] = {"Maestra's Post", {415}, 6648 },
+   [415] = {"Astranaar", {431}, 6648 },
+   [420] = {"Silverwind Refuge", {2358}, 6648 },
+   [431] = {"Splintertree Post", {415}, 6648} --NO COMMA after last }
+}
+
+local PATHS = --format observable
+{
+		--Lakeshire >>>> Stonewatch Tower
+   { 
+      townA = 69,
+      townB = 999,
+      path = {
+         {-9268.49,-2255.57,64.57,4.23},
+         {-9268.10,-2281.49,68.87,4.75},
+         {-9229.53,-2316.44,79.87,5.51},
+         {-9193.83,-2359.65,88.58,5.38},
+         {-9159.59,-2385.22,97.81,4.68},
+         {-9157.15,-2404.65,103.16,4.94},
+         {-9138.44,-2467.08,112.84,5.00},
+         {-9130.21,-2488.40,115.81,5.09},
+         {-9131.80,-2509.43,118.54,4.64},
+         {-9136.70,-2568.73,116.11,4.63},
+         {-9137.54,-2585.96,116.53,4.60},
+         {-9139.28,-2602.60,110.63,4.61},
+         {-9161.98,-2622.15,107.40,3.84},
+         {-9182.77,-2643.51,101.78,4.09},
+         {-9182.85,-2673.26,95.44,4.69},
+         {-9182.50,-2704.75,89.45,4.79},
+         {-9175.27,-2801.81,92.00,4.79},
+         {-9160.02,-2873.18,93.51,4.94},
+         {-9158.99,-2946.09,93.05,4.32},
+         {-9187.31,-2951.99,94.87,2.66},
+         {-9200.38,-2938.25,101.07,2.29},
+         {-9218.94,-2935.91,111.88,3.01},
+         {-9212.36,-2918.07,112.85,0.76},
+         {-9197.85,-2903.28,112.91,1.06},
+         {-9203.23,-2900.13,112.91,2.62}
+      }
+   },
+		--Forest Song >>>> Astranaar
+   {
+      townA = 2358,
+      townB = 415,
+      path = {
+         {3015.54,-3271.50,160.10,1.06},
+         {2989.19,-3264.29,161.33,2.44},
+         {2944.44,-3231.00,164.63,2.50},
+         {2902.73,-3193.49,172.21,2.38},
+         {2872.83,-3165.24,175.19,2.72},
+         {2836.24,-3147.08,173.85,2.56},
+         {2803.51,-3125.59,175.65,2.57},
+         {2769.63,-3124.55,169.77,3.12},
+         {2724.70,-3127.17,163.05,3.14},
+         {2699.38,-3119.44,159.26,2.85},
+         {2650.15,-3066.37,160.98,2.33},
+         {2577.88,-2966.65,160.96,2.19},
+         {2549.60,-2908.81,160.67,1.85},
+         {2545.66,-2875.42,158.93,1.71},
+         {2543.57,-2859.60,161.46,1.67},
+         {2542.74,-2842.36,158.67,2.10},
+         {2498.98,-2775.05,152.54,2.15},
+         {2443.75,-2724.62,142.98,2.40},
+         {2385.42,-2700.26,134.24,2.75},
+         {2243.01,-2674.00,114.47,2.96},
+         {2174.30,-2632.96,107.87,2.56},
+         {2056.22,-2504.16,93.91,2.31},
+         {2000.80,-2402.08,89.23,2.07},
+         {1964.85,-2301.20,90.95,2.00},
+         {1947.64,-2253.54,92.67,1.88},
+         {1940.26,-2205.58,93.88,1.71},
+         {1932.97,-2169.28,93.80,1.71},
+         {1948.37,-2099.52,94.63,1.36},
+         {1966.65,-2013.96,96.27,1.34},
+         {1976.78,-1979.72,96.37,1.22},
+         {1981.06,-1968.48,99.12,1.20},
+         {1987.23,-1952.61,96.55,1.20},
+         {2002.99,-1918.45,98.50,1.08},
+         {2040.14,-1883.06,98.50,0.67},
+         {2157.74,-1795.68,100.26,0.58},
+         {2248.42,-1744.96,110.42,0.50},
+         {2301.05,-1705.53,119.31,0.65},
+         {2331.02,-1667.35,125.38,0.93},
+         {2362.03,-1583.20,125.29,1.23},
+         {2382.10,-1483.06,125.32,1.35},
+         {2409.10,-1415.65,125.29,1.18},
+         {2440.05,-1336.99,125.30,1.18},
+         {2445.01,-1250.09,124.81,1.48},
+         {2468.39,-1169.86,125.37,1.29},
+         {2510.14,-1055.88,128.31,1.27},
+         {2522.69,-975.32,129.59,1.46},
+         {2518.04,-887.52,133.53,1.64},
+         {2486.77,-830.27,137.15,2.12},
+         {2480.83,-767.13,132.78,1.75},
+         {2471.99,-711.83,124.93,1.75},
+         {2461.04,-656.48,116.25,1.80},
+         {2447.62,-561.69,114.74,1.49},
+         {2456.36,-509.80,114.81,0.92},
+         {2498.89,-484.17,114.81,0.53},
+         {2524.53,-479.33,114.00,0.16},
+         {2605.13,-461.93,106.98,0.28},
+         {2620.96,-455.38,109.54,0.41},
+         {2635.19,-449.21,106.73,0.41},
+         {2668.97,-431.67,107.24,0.59},
+         {2694.66,-397.40,107.25,1.55},
+         {2695.29,-380.14,109.42,1.56},
+         {2690.21,-375.99,110.05,2.48}
+      }
+   },
+		--Maestra's Post >>>> Astranaar
+   {
+      townA = 413,
+      townB = 415,
+      path = {
+         {3196.95,179.16,4.76,3.54},
+         {3207.11,189.89,6.04,1.93},
+         {3200.02,206.35,8.21,2.00},
+         {3191.92,218.41,13.77,2.29},
+         {3177.13,224.98,16.86,2.72},
+         {3154.26,231.85,22.12,2.92},
+         {3109.82,229.55,34.83,3.20},
+         {3076.15,214.47,45.90,3.61},
+         {3050.85,182.62,54.73,4.06},
+         {3021.23,151.92,63.28,3.82},
+         {2993.01,151.42,69.26,3.16},
+         {2974.57,159.44,74.17,2.67},
+         {2936.80,179.73,84.70,2.65},
+         {2910.57,189.51,89.26,2.80},
+         {2865.91,194.73,93.78,3.08},
+         {2848.36,187.00,97.62,3.63},
+         {2829.17,167.39,101.29,3.86},
+         {2818.82,144.46,102.15,4.29},
+         {2812.65,109.80,101.39,4.54},
+         {2811.63,68.48,97.47,4.70},
+         {2818.21,23.68,95.17,4.95},
+         {2834.15,-9.68,95.08,5.15},
+         {2860.24,-56.98,101.10,5.23},
+         {2867.60,-111.76,101.12,4.86},
+         {2862.78,-166.89,103.21,4.63},
+         {2856.10,-194.54,104.86,4.48},
+         {2828.54,-243.80,106.47,4.16},
+         {2818.96,-255.63,109.49,4.03},
+         {2808.24,-269.18,106.93,4.05},
+         {2788.43,-297.22,107.09,4.11},
+         {2755.26,-342.86,107.10,4.07},
+         {2724.82,-374.56,107.10,3.97},
+         {2697.90,-382.98,108.80,3.45},
+         {2691.23,-376.52,110.01,2.43}
+      }
+   },
+		--Astranaar <<>> Splintertree Post
+   {
+      townA = 415,
+      townB = 431,
+      path = {
+         {2689.31,-376.47,110.05,4.67},
+         {2681.00,-410.46,107.21,4.46},
+         {2641.83,-443.53,107.26,3.80},
+         {2632.20,-447.70,106.62,3.55},
+         {2620.67,-452.74,109.42,3.55},
+         {2607.63,-458.17,106.61,3.53},
+         {2565.22,-467.92,108.54,3.22},
+         {2508.01,-474.33,114.92,3.34},
+         {2470.50,-489.64,114.81,3.55},
+         {2454.01,-504.58,114.81,3.97},
+         {2446.87,-523.81,115.05,4.40},
+         {2444.29,-540.60,115.26,4.65},
+         {2444.16,-584.80,113.91,4.72},
+         {2454.81,-655.39,116.07,4.88},
+         {2460.72,-681.35,119.76,4.92},
+         {2466.72,-712.81,125.53,4.87},
+         {2468.62,-731.08,128.62,4.79},
+         {2473.29,-780.81,134.65,4.81},
+         {2478.36,-817.67,137.73,4.85},
+         {2485.62,-846.35,136.90,4.99},
+         {2504.86,-871.82,134.96,5.35},
+         {2513.09,-905.98,131.87,4.95},
+         {2514.08,-945.47,130.38,4.75},
+         {2512.53,-997.31,129.15,4.67},
+         {2500.97,-1063.26,127.97,4.53},
+         {2477.75,-1121.66,126.10,4.34},
+         {2467.07,-1158.23,125.09,4.45},
+         {2453.14,-1190.30,124.09,4.35},
+         {2439.74,-1237.07,124.33,4.46},
+         {2435.92,-1285.43,124.97,4.63},
+         {2430.08,-1337.69,125.27,4.59},
+         {2416.88,-1376.19,125.06,4.35},
+         {2399.13,-1415.20,125.27,4.29},
+         {2383.24,-1453.11,125.27,4.33},
+         {2370.73,-1490.56,125.29,4.42},
+         {2356.07,-1568.68,125.29,4.51},
+         {2344.11,-1612.65,125.29,4.43},
+         {2326.03,-1658.48,125.41,4.33},
+         {2306.75,-1683.77,122.01,4.08},
+         {2279.36,-1711.83,116.70,3.94},
+         {2250.72,-1733.64,112.19,3.77},
+         {2213.15,-1753.74,106.87,3.63},
+         {2172.34,-1778.14,102.10,3.68},
+         {2129.50,-1805.57,99.43,3.72},
+         {2083.66,-1839.77,98.79,3.78},
+         {2040.97,-1870.15,98.50,3.73},
+         {2005.98,-1898.42,98.50,3.84},
+         {1991.94,-1921.80,98.45,4.33},
+         {1984.86,-1949.61,96.69,4.40},
+         {1983.28,-1954.29,96.37,4.33},
+         {1981.73,-1958.13,96.63,4.33},
+         {1980.40,-1961.44,97.97,4.33},
+         {1978.99,-1964.95,99.03,4.33},
+         {1977.79,-1967.94,99.00,4.33},
+         {1976.63,-1970.81,98.13,4.33},
+         {1975.60,-1973.37,96.91,4.33},
+         {1974.36,-1976.46,96.36,4.33},
+         {1973.13,-1980.82,96.72,4.33},
+         {1969.96,-1989.56,96.65,4.33},
+         {1959.46,-2018.96,95.93,4.41},
+         {1940.52,-2089.24,94.43,4.46},
+         {1937.85,-2130.25,94.83,4.66},
+         {1927.21,-2161.69,93.85,4.38},
+         {1931.56,-2188.74,93.69,4.92},
+         {1935.73,-2218.96,94.32,4.81},
+         {1942.88,-2270.94,92.11,4.86},
+         {1963.40,-2326.83,90.28,5.26},
+         {1984.35,-2372.28,87.93,5.16},
+         {1998.83,-2396.88,89.34,5.29},
+         {2027.42,-2409.22,88.05,5.93},
+         {2048.58,-2418.09,87.67,5.83},
+         {2065.16,-2414.69,87.20,0.26}
+      }
+   }
+}
+
+---------------------------------
+--STOP MODIFYING HOLY CRAP STOP--
+---------------------------------
+
+PLAYER_TAXI_DB = {} --[player] = { start_vector, target_vector, start_time, update_function_ref, current_path }
+
+-----------------------
+
+--[[
+   * Calculate the angle between two 2d vectors
+   * (vector = table with x and y members)
+   * Returns angle (radians)
+--]]
+local function calcRadAngle(startVector, destVector)
+   local dx = destVector.x - startVector.x;
+   local dy = destVector.y - startVector.y;
+   local angle = 0;
+   if (dx < 0) then
+      angle = math.atan(dy / dx) + math.pi;
+   elseif (dy < 0) then
+		angle = math.atan(dy / dx) + (2 * math.pi);
+	else
+		angle = math.atan(dy / dx);
+	end
+   return angle;
+end
+
+--[[
+   * Determine x and y based on origin, speed, time and direction
+   * Returns x,y
+--]]
+local function determinePosition(startVector, destVector, speed, _time)
+   local angle = calcRadAngle(startVector, destVector);
+   local dist = speed * _time;
+   local retx = startVector.x + dist * math.cos(angle);
+   local rety = startVector.y + dist * math.sin(angle);
+   return retx, rety;
+end
+
+--[[
+   * Creates a 2D vector of the unit's current position
+   * Returns 2D vector
+--]]
+local function get2DVector(unit)
+   if (not type(unit) == "userdata" or not unit:IsInWorld()) then print("get2DVector error: Unit is invalid!"); return nil; end
+   local x,y = unit:GetLocation();
+   local ret = {x=x, y=y};
+   return ret;
+end
+
+--[[
+   * Returns an array in reverse order from original
+--]]
+function table.reverse(t)
+   local ret = {};
+   local up = 1;
+   for i = #t, 1, -1 do
+      ret[up] = t[i];
+      up = up + 1;
+   end
+   return ret;
+end
+
+--[[
+   * Returns key if v is in table, otherwise false.
+--]]
+function table.find(t, v)
+    if (type(t) == "table" and v) then
+        for k, val in pairs(t) do
+            if (v == val) then
+                return k;
+            end
+        end
+    end
+    return false;
+end
+
+
+--[[
+   * Returns coordinates between TownA and TownB, reversed if necessary, nil if nothing.
+--]]
+local function getPathCoords(A, B)
+   for _, path_info in ipairs(PATHS) do
+      if (path_info.townA == A and path_info.townB == B) then
+         return path_info.path;
+      elseif (path_info.townA == B and path_info.townB == A) then
+         return table.reverse(path_info.path);
+      end
+   end
+   return nil;
+end
+
+--[[
+   * Returns true if A can go to B <BUT> B cannot go to A.
+--]]
+local function isOneWay(A, B)
+   if (TOWNS[A] and table.find(TOWNS[A][2], B)) then
+      if (TOWNS[B] and not table.find(TOWNS[B][2], A)) then
+         return true;
+      end
+   end
+   return false;
+end
+
+--[[
+   * Now for the basic gossips that implement these funcs.
+--]]
+function RONIN_TAXIS.OnGossip(pUnit, e, player)
+   local area = pUnit:GetAreaId()
+   if (not TOWNS[area]) then print("Ronin Taxi System ERROR: Area "..area.." has no visitable towns! No gossip menu shown."); return; end
+   pUnit:GossipCreateMenu(65536, player, 0) --Where would you like to go, $N?
+   for k, dest_area in pairs(TOWNS[area][2]) do
+      local oneWayString = ""
+      if (isOneWay(area, dest_area)) then oneWayString = " (One Way)"; end
+      pUnit:GossipMenuAddItem(2, TOWNS[dest_area][1]..oneWayString, dest_area, 0)
+   end
+   pUnit:GossipMenuAddItem(0, "Nevermind.", 999999, 0)
+   pUnit:GossipSendMenu(player)
+end
+
+function RONIN_TAXIS.OnGossipSelect(pUnit, e, player, id, dest_area, code)
+   if (dest_area == 999999) then player:GossipComplete(); return; end
+   local area = pUnit:GetAreaId()
+   local path_coords = getPathCoords(area, dest_area)
+   if (not path_coords) then print("Ronin Taxi System ERROR: Area "..area.." has no path to "..dest_area.."!"); return; end
+   PLAYER_TAXI_DB[tostring(player)] = { {x=player:GetX(),y=player:GetY()}, {x=path_coords[1][1],y=path_coords[1][2]}, os.clock()*1000 }
+   local path = PathLib.Create(player, 14, path_coords, RONIN_TAXIS.OnPathNode)
+   path.mountedSpellID = TOWNS[area][3]
+   PLAYER_TAXI_DB[tostring(player)][5] = path
+   player:CastSpell(TOWNS[area][3])
+   local aura = player:GetAuraObjectById(TOWNS[area][3])
+   aura:SetVar("AuraInterruptFlags", 0x2)
+   path:StartPath()
+   PLAYER_TAXI_DB[tostring(player)][4] = CreateLuaEvent(function() RONIN_TAXIS.UpdatePosition(path) end, 500, 0)
+end
+
+function RONIN_TAXIS.OnPathNode(path)
+   if (path.currentNode == 0) then path:Continue(); return; end
+   if (path.currentNode == #(path.coords)) then path.unit:RemoveAura(path.mountedSpellID); return; end
+   local player = path.unit
+   if (not PLAYER_TAXI_DB[tostring(player)] or not player:IsInWorld()) then return; end
+   PLAYER_TAXI_DB[tostring(player)][1] = {x=path.coords[path.currentNode][1],y=path.coords[path.currentNode][2]}
+   PLAYER_TAXI_DB[tostring(player)][2] = {x=path.coords[path.destNode][1],y=path.coords[path.destNode][2]}
+   PLAYER_TAXI_DB[tostring(player)][3] = os.clock()*1000
+   path:Continue()
+end
+
+function RONIN_TAXIS.UpdatePosition(path)
+   local player = path.unit
+   if (not PLAYER_TAXI_DB[tostring(player)] or not player:IsInWorld()) then return; end
+   local x, y = determinePosition(PLAYER_TAXI_DB[tostring(player)][1], PLAYER_TAXI_DB[tostring(player)][2], path.speed, (os.clock()*1000 - PLAYER_TAXI_DB[tostring(player)][3]) / 1000)
+   player:SetServersidePosition(x, y, player:GetLandHeight(x,y), player:GetO())
+end
+
+function RONIN_TAXIS.OnAuraRemove(event, aura)
+   local player = aura:GetTarget()
+   if (not (PLAYER_TAXI_DB[tostring(player)] and aura:GetSpellId() == PLAYER_TAXI_DB[tostring(player)][5].mountedSpellID)) then return; end
+   local x, y = determinePosition(PLAYER_TAXI_DB[tostring(player)][1], PLAYER_TAXI_DB[tostring(player)][2], PLAYER_TAXI_DB[tostring(player)][5].speed, (os.clock()*1000 - PLAYER_TAXI_DB[tostring(player)][3]) / 1000)
+   local o = calcRadAngle(PLAYER_TAXI_DB[tostring(player)][1], PLAYER_TAXI_DB[tostring(player)][2])
+   local z = player:GetLandHeight(x,y)
+   if (z > 99999) then z = player:GetZ(); end
+   player:MovePlayerTo(x, y, z, o, 256)
+   player:SetFacing(o)
+   player:SetPlayerLock(0)
+   DestroyLuaEvent(PLAYER_TAXI_DB[tostring(player)][4])
+   PLAYER_TAXI_DB[tostring(player)] = nil
+end
+
+function RONIN_TAXIS.OnLogout(e, player)
+   if (not PLAYER_TAXI_DB[tostring(player)]) then return; end
+   player:RemoveAura(PLAYER_TAXI_DB[tostring(player)][5].mountedSpellID)
+end
+
+for k,entry in pairs(TAXI_MASTERS) do
+   RegisterUnitGossipEvent(entry, 1, RONIN_TAXIS.OnGossip)
+   RegisterUnitGossipEvent(entry, 2, RONIN_TAXIS.OnGossipSelect)
+end
+RegisterServerHook(31, RONIN_TAXIS.OnAuraRemove)
+RegisterServerHook(12, RONIN_TAXIS.OnLogout)

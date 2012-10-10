@@ -1,0 +1,94 @@
+-----------------------
+--Made by Hypersniper--
+-------wow-v.com-------
+--For Burning Heavens--
+-----------------------
+
+BLOODBONE = {}
+BLOODBONE.entry = 20000 --boss entry
+BLOODBONE.gossiperEntry = 20001 --ghost that gossips
+BLOODBONE.gossiperNpcTextEntry = 10000 --npc_text entry that says "leave while you still can" etc
+BLOODBONE.skeletonEntry = 20002 -- skeletons that he summons
+
+BLOODBONE.spawnCoords = {1000, 1000, 0, 0} --x,y,z,o
+
+function BLOODBONE.OnGossipStart(pUnit, event, player)
+   pUnit:GossipCreateMenu(player, BLOODBONE.gossiperNpcTextEntry, 0)
+   pUnit:GossipMenuAddItem(0, "I am ready to fight Bloodbone!", 1, 0)
+   pUnit:GossipMenuAddItem(0, "I need some more time to prepare.", 2, 0)
+   pUnit:GossipSendMenu(player)
+end
+
+function BLOODBONE.OnGossipSel(pUnit, event, player, id, intid, code)
+   if (intid == 2) then
+      player:GossipComplete()
+   elseif (intid == 1) then
+      player:GossipComplete()
+      pUnit:SendChatMessage(12, 0, "Very well, but don't say I didn't warn you...")
+      pUnit:RegisterEvent("BLOODBONE:Summoning", 3000, 1)
+   end
+end
+
+function BLOODBONE:Summoning(pUnit, player)
+   pUnit:SetFacing(pUnit:CalcRadAngle(pUnit:GetX(), pUnit:GetY(), self.spawnCoords[1], self.spawnCoords[2]))
+   pUnit:CastSpell(34656) --arcane explosion visual
+   pUnit:SpawnCreature(self.entry, self.spawnCoords[1], self.spawnCoords[2], self.spawnCoords[3], self.spawnCoords[4], 14, 0)
+end
+
+function BLOODBONE.OnSpawn(pUnit)
+   local p = pUnit:GetRandomPlayer(0)
+   if (p and p:IsInWorld() and p:IsAlive()) then
+      pUnit:AttackReaction(p, 1000, 0)
+   end
+end
+
+function BLOODBONE.OnCombat(pUnit)
+   pUnit:SendChatMessage(14, 0, "So... fresh!")
+   pUnit:RegisterEvent("BLOODBONE.Whirlwind", 15000, 0)
+   pUnit:RegisterEvent("BLOODBONE.MortalStrike", 10000, 0)
+   pUnit:RegisterEvent("BLOODBONE.Slam", 6000, 0)
+   RegisterTimedEvent("BLOODBONE.SwapTanks", 1000, 0, pUnit, 70)
+   pUnit:RegisterEvent("BLOODBONE.Berserk", 1000, 0)
+end
+
+function BLOODBONE.Whirlwind(pUnit)
+   pUnit:ChannelSpell(40219, pUnit)
+end
+
+function BLOODBONE.MortalStrike(pUnit)
+   pUnit:CastSpellOnTarget(13737, pUnit:GetMainTank())
+end
+
+function BLOODBONE.Slam(pUnit)
+   pUnit:FullCastSpell(56402) --crashing slam
+end
+
+function BLOODBONE.SwapTanks(pUnit, pct)
+   if (pUnit:GetHealthPct() <= pct) then
+      RemoveTimedEvents()
+      pUnit:CastSpellOnTarget(25515, pUnit:GetMainTank())
+      pUnit:Attack(pUnit:GetAddTank())
+      RegisterTimedEvent("BLOODBONE.SwapTanks", 1000, 0, pUnit, 40)
+      local qt = { {-5, -5}, {-5, 5}, {0, 0}, {5, -5}, {5, 5} }
+      for i=1,5 do
+         pUnit:SpawnCreature(BLOODBONE.skeletonEntry, pUnit:GetX() + qt[i][1], pUnit:GetY() + qt[i][2], pUnit:GetZ(), pUnit:GetO(), 14, 120000)
+      end
+   end
+end
+
+function BLOODBONE.Berserk(pUnit)
+   if (pUnit:GetHealthPct() <= 10) then
+      pUnit:CastSpell(16160) --bloodlust
+      pUnit:RemoveEvents()
+   end
+end
+
+function BLOODBONE.removeEvents(pUnit, event)
+   pUnit:RemoveEvents()
+   RemoveTimedEvents()
+end
+
+RegisterUnitGossipEvent(BLOODBONE.gossiperEntry, 1, "BLOODBONE.OnGossipStart")
+RegisterUnitGossipEvent(BLOODBONE.gossiperEntry, 2, "BLOODBONE.OnGossipSel")
+RegisterUnitEvent(BLOODBONE.entry, 18, "BLOODBONE.OnSpawn")
+RegisterUnitEvent(BLOODBONE.entry, 1, "BLOODBONE.OnCombat")

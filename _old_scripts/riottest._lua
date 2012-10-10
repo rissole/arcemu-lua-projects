@@ -1,0 +1,99 @@
+function DeathDealer_OnCombat(pUnit, event)
+pUnit:SendChatMessage(12, 0, "It seems like i'm going to have some fun")
+pUnit:RegisterEvent("DeathDealer_Heal", 19000, 0)
+pUnit:RegisterEvent("DeathDealer_DivineStorm", 21000, 0)
+pUnit:RegisterEvent("DeathDealer_Phase1", 1000, 0)
+end
+
+function DeathDealer_Phase1(pUnit, event)
+if pUnit:GetHealthPct() <= 80 then
+pUnit:RemoveEvents()
+pUnit:SendChatMessage(12, 0, "you cannot beat me so give up")
+pUnit:RegisterEvent("DeathDealer_Consecration", 17000, 0)
+pUnit:RegisterEvent("DeathDealer_Stun", 25000, 0)
+pUnit:RegisterEvent("DeathDealer_Heal", 20000, 0)
+pUnit:RegisterEvent("DeathDealer_Phase2", 1000, 0)
+end
+end
+
+function DeathDealer_Phase2(pUnit, event)
+if pUnit:GetHealthPct() <= 50 then
+pUnit:RemoveEvents()
+pUnit:SendChatMessage(12, 0, "Death shall soon be upon you")
+pUnit:RegisterEvent("DeathDealer_Consecration", 22000, 0)
+pUnit:RegisterEvent("DeathDealer_Stun", 23000, 0)
+pUnit:RegisterEvent("DeathDealer_Heal", 24000, 0)
+pUnit:RegisterEvent("DeathDealer_DivineStorm", 27000, 0)
+pUnit:RegisterEvent("DeathDealer_Phase3", 1000, 0)
+end
+end
+
+function DeathDealer_Phase3(pUnit, event)
+if pUnit:GetHealthPct() <= 30 then
+pUnit:RemoveEvents()
+pUnit:SendChatMessage(12, 0, "This is going to have to end soon")
+pUnit:RegisterEvent("DeathDealer_Consecration", 22000, 0)
+pUnit:RegisterEvent("DeathDealer_Stun", 23000, 0)
+pUnit:RegisterEvent("DeathDealer_Stun2", 27000, 0)
+pUnit:RegisterEvent("DeathDealer_Heal", 24000, 0)
+pUnit:RegisterEvent("DeathDealer_DivineStorm", 27000, 0)
+pUnit:RegisterEvent("DeathDealer_Bubble", 50000, 0)
+pUnit:RegisterEvent("DeathDealer_Phase4", 1000, 0)
+end
+end
+
+function DeathDealer_Phase4(pUnit, event)
+if pUnit:GetHealthPct() <= 10 then
+pUnit:RemoveEvents()
+pUnit:SendChatMessage(14, 0, "THIS IS GOING TO END NOW!")
+pUnit:RegisterEvent("DeathDealer_Consecration", 20000, 0)
+pUnit:RegisterEvent("DeathDealer_Stun", 22000, 0)
+pUnit:RegisterEvent("DeathDealer_Stun2", 25000, 0)
+pUnit:RegisterEvent("DeathDealer_Heal", 24000, 0)
+pUnit:RegisterEvent("DeathDealer_DivineStorm", 27000, 0)
+pUnit:RegisterEvent("DeathDealer_Bubble", 35000, 0)
+pUnit:RegisterEvent("DeathDealer_Enrage", 100000, 0)
+end
+end
+
+function DeathDealer_DivineStorm(pUnit, event)
+pUnit:FullCastSpellOnTarget(58127, pUnit:GetRandomPlayer(0))
+end
+
+function DeathDealer_Consecration(pUnit, event)
+pUnit:FullCastSpellOnTarget(36946, pUnit:GetRandomPlayer(0))
+end
+
+function DeathDealer_Stun(pUnit, event)
+pUnit:FullCastSpellOnTarget(56, pUnit:GetRandomPlayer(0))
+end
+
+function DeathDealer_Stun2(pUnit, event)
+pUnit:FullCastSpellOnTarget(42435, pUnit:GetRandomPlayer(0))
+end
+
+function DeathDealer_Bubble(pUnit, event)
+pUnit:CastSpell(642)
+end
+
+function DeathDealer_Heal(pUnit, event)
+pUnit:CastSpell(34119)
+end
+
+function DeathDealer_Enrage(pUnit, event)
+pUnit:SendChatMessage(14, 0, "ENOUGH IS ENOUGH PREPARE TO DIE!")
+pUnit:CastSpell(26662)
+end
+
+function DeathDealer_OnDeath(pUnit, event)
+pUnit:SendChatMessage(12, 0, "I wish i tried harder!")
+pUnit:RemoveEvents()
+end
+
+function DeathDealer_OnLeaveCombat(pUnit, event)
+pUnit:RemoveEvents()
+end
+
+RegisterUnitEvent(800013, 1, "DeathDealer_OnCombat")
+RegisterUnitEvent(800013, 2, "DeathDealer_OnLeaveCombat")
+RegisterUnitEvent(800013, 4, "DeathDealer_OnDeath")

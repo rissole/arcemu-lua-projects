@@ -1,0 +1,9 @@
+﻿## Interface: 33500
+## Title: CommCinematic
+## Notes: Communicator module for viewing custom cinematics.
+## Author: Hypersniper
+## Version: 1.0
+## Dependencies: Communicator
+CommCinematic.lua
+CommCinematicFrame.lua
+CommCinematicFrame.xml

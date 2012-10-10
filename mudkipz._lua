@@ -1,0 +1,373 @@
+--Made by hypersniper
+--For WoW-v community :)
+OBJECT_END =                               0x0006
+UNIT_FIELD_SUMMONEDBY =                    OBJECT_END + 0x0008
+UNIT_FIELD_CREATEDBY =                     OBJECT_END + 0x000A
+
+--Entry IDs here!
+local npc_entry = 133760
+local item_entry = 133760
+
+--The big table that will hold everything.
+MUDKIP = {}
+
+--This makes random numbers more random.
+math.randomseed(os.time())
+math.random(); math.random(); math.random();
+
+--Constants so I don't forget spells :P
+local ICEBLOCK = 45438
+local FROSTSHK = 39062
+local FROSTBLT = 59280
+local WATERBLT = 60869
+local SLINGMUD = 3650
+local ESCARTST = 20589
+local SURGESPD = 65828
+local ICEARMOR = 12544
+local HEALINGW = 44256
+local MANAPOTN = 32453
+local KIPTACKL = 56104
+local TRINKETX = 42292
+local SURGEPWR = 57407
+local TYPHOONX = 51817
+
+--Tables/Database used for custom spell management - [ID] = {mana=cost, cooldown=seconds}
+local kipSpells = {
+[45438] = {mana=700, cooldown=120},
+[39062] = {mana=700, cooldown=10},
+[59280] = {mana=500, cooldown=3},
+[60869] = {mana=100, cooldown=0},
+[3650]  = {mana=400, cooldown=10},
+[20589] = {mana=0, cooldown=90},
+[65828] = {mana=400, cooldown=90},
+[12544] = {mana=500, cooldown=0},
+[44256] = {mana=500, cooldown=0},
+[32453] = {mana=0, cooldown=120},
+[56104] = {mana=500, cooldown=30},
+[42292] = {mana=0, cooldown=90},
+[57407] = {mana=0, cooldown=1800},
+[51817] = {mana=700, cooldown=30}
+}
+
+--Constants representing mudkip states
+local KIPSTATE_NONCOMBAT = 0
+local KIPSTATE_COMBAT = 1
+local KIPSTATE_OWNERDANGER = 2
+local KIPSTATE_TROUBLE = 3
+local KIPSTATE_RUNNING = 4
+local KIPSTATE_END = 5
+
+--Table that contains the Mechanic IDs that the PVP trinket can remove
+MUDKIP.trinketMechanics = {1, 2, 5, 10, 12, 13, 14, 17, 18, 22, 24, 30}
+
+--[[                                  
+   * Called to check whether the kip can cast a spell.
+   * Custom function for greater spell control.
+   * (mana check, cooldown check)
+--]]
+function kipCanCast(pUnit, id)
+   local cd = MUDKIP[tostring(pUnit)].cooldowns[id]
+   if (cd ~= nil) then
+      if (cd > os.time()) then 
+         return -1
+      elseif (kipSpells[id].mana > pUnit:GetMana()) then
+         return -2
+      end
+   end
+   return true
+end
+
+--[[                                  
+   * Called when kip is casting a spell.
+   * Custom function for greater spell control.
+   * (mana management, cooldown management, spell type)
+--]]
+function kipCast(pUnit, id, target, full)
+   local res = kipCanCast(pUnit, id)
+   if (res == -2) then kipCast(pUnit, MANAPOTN, false, true); end
+   if (res ~= true) then return res; end
+   MUDKIP[tostring(pUnit)].cooldowns[id] = os.time()+kipSpells[id].cooldown
+   pUnit:SetMana(pUnit:GetMana()-kipSpells[id].mana)
+   if (full) then
+      if (target == false) then
+         pUnit:FullCastSpell(id)
+      else
+         pUnit:FullCastSpellOnTarget(id, target)
+      end
+   else
+      if (target == false) then
+         pUnit:CastSpell(id)
+      else
+         pUnit:CastSpellOnTarget(id, target)
+      end
+   end
+end
+
+--[[                                  
+   * Called when needing to block an Ai state(s)
+   * To prevent kippy from getting stuck in one state
+   * Contains setting the appropriate table value.
+--]]
+function kipPauseAi(pUnit, seconds, state)
+   if (state ~= nil) then --state is option - if not there, block all states.
+      MUDKIP[tostring(pUnit)].pausedAi[state] = os.time()+seconds
+   else
+      MUDKIP[tostring(pUnit)].pausedAi["all"] = os.time()+seconds
+   end
+end
+
+--[[                                  
+   * Appropriately positions the mudkip.
+   * He stops and faces the enemy once he's in range.
+--]]
+function kipRun(pUnit, enemy, minDist, maxDist, x, y, z)
+   local d = pUnit:GetDistanceYards(enemy)
+   local sUnit = tostring(pUnit)
+   if ( (d > minDist and d < maxDist) or MUDKIP[sUnit].state == 0 or pUnit:GetCurrentSpellId() ~= nil or MUDKIP[sUnit].runTime >= 5000) then
+      pUnit:SetFacing(pUnit:CalcRadAngle(pUnit:GetX(), pUnit:GetY(), enemy:GetX(), enemy:GetY()))
+      MUDKIP[sUnit].runTime = 0
+      return
+   end
+   MUDKIP[sUnit].runTime = MUDKIP[sUnit].runTime + 1000
+   if (d < minDist) then
+      if (x == nil) then --if we didn't give any co-ords, make some ourselves.
+         x = enemy:GetX() + (maxDist-minDist)
+         y = enemy:GetY() + (maxDist-minDist)
+         z = pUnit:GetLandHeight(x, y)
+      end
+      pUnit:MoveTo(x, y, z, 0)
+      RegisterTimedEvent("kipRun", 1000, 1, pUnit, enemy, minDist, maxDist, x, y, z)
+   elseif (d > maxDist) then
+      pUnit:MoveTo(enemy:GetX(), enemy:GetY(), enemy:GetZ(), enemy:GetO())
+      RegisterTimedEvent("kipRun", 1000, 1, pUnit, enemy, minDist, maxDist)
+   end
+end
+
+--[[                                  
+   * Occurs every second while the kip exists.
+   * Contains choosing a "state" that the kip can be in based on environment
+   * and then taking appropriate action based on that state.
+     * STATE - CONDITIONS - DESCRIPTION
+     * NONCOMBAT - No battling - Ensure following, send random chat messages.
+     * COMBAT - Regular attacks - Setting distance to enemy, casting spells.
+     * OWNERDANGER - Owner is stunned / critical health - Perform savior combo and heal.
+     * TROUBLE - Kip has negative aura - Try to dispel it
+     * RUNNING - Kip has critical health - Speed boost, run away, heal
+--]]
+function MUDKIP.OnTick(pUnit)
+   local kip = MUDKIP[tostring(pUnit)]
+   --print("kip state: "..kip.state)
+   if (kip.owner:IsDead() or kip.owner:IsInWorld() == false) then
+      MUDKIP.OnOwnerDie(pUnit, kip.ownerName)
+      return
+   end
+   if (kip.pausedAi["all"] > os.time()) then return; end
+   if ( (kip.owner:IsInCombat() or pUnit:IsInCombat()) and kip.pausedAi[1] < os.time() ) then
+      MUDKIP[tostring(pUnit)].state = KIPSTATE_COMBAT
+      if ( (kip.owner:IsStunned() or kip.owner:GetHealthPct() < 20) and kip.pausedAi[2] < os.time()) then
+         kip.state = KIPSTATE_OWNERDANGER
+      end
+      if (pUnit:HasNegativeAura() and kip.pausedAi[3] < os.time()) then
+         kip.state = KIPSTATE_TROUBLE
+      end
+      if (pUnit:GetHealthPct() < 20 and kip.pausedAi[4] < os.time()) then
+         kip.state = KIPSTATE_RUNNING
+      end
+   else
+      kip.state = KIPSTATE_NONCOMBAT
+   end
+
+   local lang = 0
+   if (kip.owner:GetTeam() == 0) then lang = 7; else lang = 1; end --7 = common, 1 = orcish
+   if (kip.state == KIPSTATE_NONCOMBAT) then
+      pUnit:WipeThreatList(); pUnit:WipeCurrentTarget();
+      pUnit:SetUnitToFollow(kip.owner, 3, 1)
+      if (pUnit:GetCurrentSpellId() ~= nil) then pUnit:InterruptSpell(); end
+      if (math.random(600) == 5) then --there is a 1 in 600 chance of this occuring, so roughly once every 10 min
+         local r = math.random(10)
+         if (r == 1) then
+            pUnit:SendChatMessage(12, lang, "I hath heardth that thou liketh kips of the mud.")
+         elseif (r == 2) then
+            pUnit:SendChatMessage(12, lang, "So I herd u liek mudkipz.")
+         elseif (r == 3) then
+            pUnit:SendChatMessage(12, lang, "All your base are belong to me.")
+         elseif (r == 4) then
+            pUnit:SendChatMessage(12, lang, "Never gonna give you up, never gonna let you down...")
+         elseif (r == 5) then
+            pUnit:SendChatMessage(12, lang, "IMMA FIRIN MAH LAZ- nevermind.")
+         elseif (r == 6) then
+            pUnit:SendChatMessage(12, lang, kip.owner:GetName()..", what does the scouter say about his power level?")
+         elseif (r == 7) then
+            pUnit:SendChatMessage(12, lang, "Now this is the story all about how")
+            pUnit:EventChat(12, lang, "My life got flip-turned upside down...", 1500)
+         elseif (r == 8) then
+            pUnit:SendChatMessage(12, lang, "Yo dawg, I heard you like mudkips and games so we put a mudkip in yo game so you can like mudkips while you game.")
+         elseif (r == 9) then
+            pUnit:SendChatMessage(12, lang, "Aww no, Im beached as bro!")
+         elseif (r == 10) then
+            pUnit:SendChatMessage(12, lang, "Alright chums, let's do this!")
+            pUnit:EventChat(14, lang, "LEEEEEEEEEROOOOOOOOOOY JENNNNNKIIIIIIIIIIINS!", 1500)
+         end
+      end
+   elseif (kip.state == KIPSTATE_COMBAT) then
+      local maintar = kip.owner:GetPrimaryCombatTarget()
+      if (maintar == nil) then
+         return
+      end
+      pUnit:AttackReaction(maintar, 1000, 0)
+      local baddie = pUnit:GetMainTank()
+      if (baddie == nil) then
+         return
+      end
+      if (MUDKIP[tostring(pUnit)].runTime == 0) then kipRun(pUnit, baddie, 10, 30); end
+      if (math.random(1, 3000) == 1) then
+         pUnit:InterruptSpell()
+         kipCast(pUnit, SURGEPWR, baddie, true)
+         pUnit:SendChatMessage(14, lang, "IMMA FIRIN MAH LAZER")
+         pUnit:EventChat(14, lang, "BLARGHH", 3000)
+      end
+      if (pUnit:GetCurrentSpellId() ~= nil) then return; end
+      if (kipCanCast(pUnit, FROSTSHK) == true) then
+         kipCast(pUnit, FROSTSHK, baddie, true)
+         kipPauseAi(pUnit, 2)
+      elseif (kipCanCast(pUnit, FROSTBLT) == true) then
+         kipCast(pUnit, FROSTBLT, baddie, true)
+         kipPauseAi(pUnit, 2)
+      else
+         kipCast(pUnit, WATERBLT, baddie, true)
+         kipPauseAi(pUnit, 2)
+      end
+   elseif (kip.state == KIPSTATE_OWNERDANGER) then
+      pUnit:WipeThreatList(); pUnit:WipeCurrentTarget();
+      local baddie = kip.owner:GetClosestEnemy()
+      if (baddie == nil) then
+         return
+      end
+      pUnit:AttackReaction(baddie, 1000, 0)
+      kipCast(pUnit, KIPTACKL, baddie, true)
+      RegisterTimedEvent("kipCast", 500, 1, pUnit, TYPHOONX, false, false)
+      RegisterTimedEvent("kipCast", 1000, 1, pUnit, SLINGMUD, baddie, true)
+      RegisterTimedEvent("kipCast", 2000, 1, pUnit, HEALINGW, kip.owner, true)
+      kipPauseAi(pUnit, 3)
+   elseif (kip.state == KIPSTATE_TROUBLE) then
+      for i,v in ipairs(MUDKIP.trinketMechanics) do
+         if (pUnit:HasAuraWithMechanic(v)) then
+            kipCast(pUnit, TRINKETX, false, true)
+            kipPauseAi(pUnit, 10, KIPSTATE_TROUBLE)
+            return
+         end
+      end
+      if (kipCanCast(pUnit, ICEBLOCK) == true) then
+         kipCast(pUnit, ICEBLOCK, false, true)
+         kipPauseAi(pUnit, 10, KIPSTATE_TROUBLE)
+         return
+      elseif (pUnit:HasAuraWithMechanic(7) or pUnit:HasAuraWithMechanic(11)) then
+         kipCast(pUnit, ESCARTST, false, true)
+         kipPauseAi(pUnit, 10, KIPSTATE_TROUBLE)
+      end
+   elseif (kip.state == KIPSTATE_RUNNING) then
+      pUnit:WipeThreatList(); pUnit:WipeCurrentTarget();
+      local baddie = pUnit:GetClosestEnemy()
+      
+if (baddie == nil) then
+         return
+      end
+      pUnit:AttackReaction(baddie, 1000, 0)
+      if (kipCanCast(pUnit, ICEBLOCK) == true) then
+         kipCast(pUnit, ICEBLOCK, false, true)
+      else
+         kipCast(pUnit, SURGESPD, false, false)
+         if (MUDKIP[tostring(pUnit)].runTime == 0) then kipRun(pUnit, baddie, 20, 40); end
+         RegisterTimedEvent("kipCast", 5000, 1, pUnit, HEALINGW, false, true)
+      end
+   end
+end
+
+--[[                                  
+   * Occurs after the kip spawns, called manually.
+   * Contains more setup for the kip itself.
+   * (OnTick event setup, managers setup, casting Ice Armor)
+--]]
+function MUDKIP.MyOnSpawn(pUnit)
+   local sUnit = tostring(pUnit)
+   pUnit:SetUInt64Value( UNIT_FIELD_SUMMONEDBY, MUDKIP[sUnit].owner:GetGUID() )
+   pUnit:SetUInt64Value( UNIT_FIELD_CREATEDBY, MUDKIP[sUnit].owner:GetGUID() )
+   pUnit:RegisterEvent("MUDKIP.OnTick", 1000, 0)
+   pUnit:SetUnitToFollow(MUDKIP[sUnit].owner, 3, 1)
+   pUnit:SetCombatMeleeCapable(1)
+   MUDKIP[sUnit].state = KIPSTATE_NONCOMBAT --state manager
+   MUDKIP[sUnit].cooldowns = {} --cooldown manager
+   MUDKIP[sUnit].pausedAi = {} --AI manager
+   MUDKIP[sUnit].pausedAi["all"] = 0
+   MUDKIP[sUnit].runTime = 0
+   for i=1, KIPSTATE_END do
+      MUDKIP[sUnit].pausedAi[i] = 0
+   end
+   kipCast(pUnit, ICEARMOR, false, false) --unit, spell, target, full
+end
+
+--[[                                  
+   * Handler for when kip's owner dies.
+   * Very similar to OnDie.
+--]]
+function MUDKIP.OnOwnerDie(pUnit, ownerName)
+   pUnit:RemoveEvents()
+   local kip = MUDKIP[tostring(pUnit)]
+   MUDKIP[ownerName].hasMudkip = nil
+   MUDKIP[tostring(pUnit)] = nil
+   pUnit:Despawn(0, 0)
+end
+
+--[[                                  
+   * Handler for kip's on die event.
+   * Contains clearing out the specific kip from the big table.
+   * (table memory clearing, removing events)
+--]]
+function MUDKIP.OnDie(pUnit)
+   pUnit:RemoveEvents()
+   local kip = MUDKIP[tostring(pUnit)]
+   MUDKIP[kip.ownerName].hasMudkip = nil
+   MUDKIP[tostring(pUnit)] = nil
+end
+
+--[[                                  
+   * Handler for kip's on leave combat event.
+   * Puts him back in combat if he leaves early.
+--]]
+function MUDKIP.OnLeaveCombat(pUnit)
+   if (MUDKIP[tostring(pUnit)].owner:IsInCombat()) then
+      pUnit:AttackReaction(MUDKIP[tostring(pUnit)].owner:GetPrimaryCombatTarget(), 10000, 0)
+   end
+end
+
+--[[                                  
+   * Handler for item's on-use event.
+   * Contains setting up parts of the MUDKIP table
+   * (cooldowns, initialising tables, creating kip)
+--]]
+function MUDKIP.OnItemUse(pItem, event, player)
+   local root = MUDKIP[player:GetName()]
+   local cd = 0
+   if (root ~= nil) then cd = root.cooldown; else MUDKIP[player:GetName()] = {}; end
+   if (cd < os.time() and MUDKIP[player:GetName()].hasMudkip == nil) then
+      local spawn = player:SpawnCreature(npc_entry, player:GetX(), player:GetY(), player:GetZ(), player:GetO(), player:GetFaction(), 0)
+      local sspawn = tostring(spawn)
+      MUDKIP[sspawn] = {}
+      MUDKIP[sspawn].owner = player
+      MUDKIP[sspawn].ownerName = player:GetName()
+      MUDKIP[player:GetName()].hasMudkip = 1 --the player now has a mudkip.
+      MUDKIP[player:GetName()].cooldown = os.time()+1800 --30 min CD
+      MUDKIP.MyOnSpawn(spawn)
+   elseif (MUDKIP[player:GetName()].hasMudkip ~= nil) then 
+      player:SendAreaTriggerMessage("|cFFFF0000You already have a Mudkip out.|r")
+   elseif (cd > os.time()) then
+      local minutes = math.ceil(os.difftime(MUDKIP[player:GetName()].cooldown, os.time()) / 60)
+      local plural = ""
+      if (minutes > 1) then plural = "s"; end
+      player:SendAreaTriggerMessage("|cFFFF0000Cooldown remaining: "..minutes.." minute"..plural..".|r");
+   end
+end
+
+RegisterItemGossipEvent(item_entry, 1, "MUDKIP.OnItemUse")
+RegisterUnitEvent(npc_entry, 4, "MUDKIP.OnDie")
+RegisterUnitEvent(npc_entry, 2, "MUDKIP.OnLeaveCombat")

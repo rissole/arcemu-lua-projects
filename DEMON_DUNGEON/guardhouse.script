@@ -1,0 +1,163 @@
+-----------------------
+--Made by Hypersniper--
+-----Project Ronin-----
+-----------------------
+
+local mod = getfenv(1)
+assert(type(mod) == "table", "RONIN_DUNGEON: Critical error, parent module missing!")
+module(mod._NAME..".GUARDHOUSE", package.seeall)
+local self = getfenv(1)
+
+local mange = 81201
+local malice = 81202
+local zoooor = 81203
+local ezza = 81204
+
+local ezza_path = { {969.41,501.85,253.84,4.13}, {963.83,491.72,254.49,4.36}, {959.38,478.89,258.75,4.33} }
+local zor_path = { {930.45,503.50,253.88,5.16}, {936.89,489.89,254.55,5.17}, {942.72,477.91,259.28,5.21} }
+
+function Hounds_OnCombat(pUnit, e, pTarget)
+   pUnit:RegisterEvent(HowlWhenClose, 1000, 0)
+end
+
+function Hounds_LeaveCombat(pUnit)
+   pUnit:RemoveEvents()
+end
+
+function HowlWhenClose(pUnit)
+   if (pUnit:GetDistanceYards(pUnit:GetClosestPlayer()) <= 5) then
+      pUnit:CastSpell(37776) --blood howl
+      pUnit:RemoveEvents()
+   end
+end
+
+function Hounds_OnDeath(pUnit)
+   pUnit:RemoveEvents()
+   local addUnit
+   if (pUnit:GetEntry() == mange) then --zoooor goes with mange
+      addUnit = mod.GetCreatureInRange(pUnit, zoooor)
+   else --ezza goes with malice
+      addUnit = mod.GetCreatureInRange(pUnit, ezza)
+   end
+   if (addUnit ~= nil and not self[tostring(addUnit)] and addUnit:IsAlive()) then
+      pUnit:SendChatMessage(16, 0, pUnit:GetName().." lets out a loud piercing howl as it dies.")
+      pUnit:PlaySoundToSet(9036) --it's a howl
+      addUnit:RegisterEvent(Hounds_PostDeath, 1500, 1)
+   end
+end
+
+function DistToPoint(x,y,z,o,x2,y2,z2,o2)
+   local posTar = {x, y, z}
+   local posNow = {x2, y2, z2}
+   local distance = 0
+   for i,v in ipairs(posNow) do
+      distance = distance + (v-posTar[i])^2
+   end
+   return math.sqrt(distance) --yards
+end
+
+function TimeToPoint(x,y,z,o,x2,y2,z2,o2,speed)
+   local dist = DistToPoint(x,y,z,o,x2,y2,z2,o2)
+   return math.floor((dist / speed) * 1000)
+end
+
+function Hounds_PostDeath(pUnit)
+   pUnit:SendChatMessage(12, 0, "Shut up you stupid dog! It's impossible to get any rest with you making so much noise!")
+   pUnit:CastSpell(12686) --enrage
+   local path = ezza_path
+   if (pUnit:GetEntry() == zoooor) then path = zor_path; end
+   local x,y,z,o = pUnit:GetLocation()
+   local x2,y2,z2,o2 = unpack(path[1])
+   pUnit:RegisterEvent(mod.CreateClosure(Guards_OnReachWP, 1), TimeToPoint(x,y,z,o,x2,y2,z2,o2,7), 1)
+   pUnit:MoveTo(x2,y2,z2,o2)
+end
+
+function Guards_OnSpawn(pUnit)
+   pUnit:WipeThreatList(); pUnit:WipeTargetList(); pUnit:SetAIState(0); 
+   pUnit:SetMovementFlags(1);
+   self[tostring(pUnit)] = nil
+end
+
+function Guards_OnReachWP(pUnit, id)
+   local path = ezza_path
+   local opath = zor_path
+   if (pUnit:GetEntry() == zoooor) then path = zor_path; opath = ezza_path; end
+   if (id == #path) then
+      local otherGuard, otherHound
+      if (pUnit:GetEntry() == zoooor) then --we called zoooor, get ezza and malice
+         otherGuard = mod.GetCreatureInRange(pUnit, ezza)
+         otherHound = mod.GetCreatureInRange(pUnit, malice)
+      else --we called ezza, get zoooor and mange
+         otherGuard = mod.GetCreatureInRange(pUnit, zoooor)
+         otherHound = mod.GetCreatureInRange(pUnit, mange)
+      end
+      if (not self[tostring(pUnit)]) then
+         self[tostring(otherGuard)] = true
+         local tar = pUnit:GetClosestPlayer()
+         for i=1,10 do
+            if (tar ~= nil and tar:IsAlive()) then break; end
+            tar = pUnit:GetRandomPlayer(0)
+         end
+         if (tar == nil or tar:IsDead()) then pUnit:WipeTargetList(); pUnit:WipeThreatList(); pUnit:SetAIState(0); end
+         pUnit:AttackReaction(tar, 1, 0)
+         pUnit:SendChatMessage(12, 0, "What the...? HEY! How did you get in here?! INTRUDER!")
+         if (otherGuard ~= nil and otherGuard:IsAlive()) then
+            otherGuard:CastSpell(20798) --demon skin
+            local x,y,z,o = otherGuard:GetLocation()
+            local x2,y2,z2,o2 = unpack(opath[1])
+            otherGuard:RegisterEvent(mod.CreateClosure(Guards_OnReachWP, 1), TimeToPoint(x,y,z,o,x2,y2,z2,o2,7), 1)
+            otherGuard:MoveTo(x2,y2,z2,o2)
+         end
+         if (otherHound ~= nil and otherHound:IsAlive()) then
+            otherHound:AttackReaction(tar, 1, 0)
+         end
+      else
+         if (otherGuard:GetMainTank() ~= nil) then
+            pUnit:AttackReaction(otherGuard:GetMainTank(), 1, 0)
+         else
+            pUnit:Despawn(0, 5000)
+            otherGuard:Despawn(0, 5000)
+         end
+      end
+      pUnit:RegisterEvent(Guards_SunderingCleave, 3000, 0)
+   else --not last point, keep movin
+      local x,y,z,o = pUnit:GetLocation()
+      local x2,y2,z2,o2 = unpack(path[id+1])
+      pUnit:RegisterEvent(mod.CreateClosure(Guards_OnReachWP, id+1), TimeToPoint(x,y,z,o,x2,y2,z2,o2,7), 1)
+      pUnit:MoveTo(x2,y2,z2,o2)
+   end
+end
+
+function Guards_SunderingCleave(pUnit)
+   pUnit:CastSpellOnTarget(17963, pUnit:GetMainTank())
+end
+
+function Guards_Reset(pUnit, event)
+   pUnit:RemoveEvents()
+   self[tostring(pUnit)] = nil
+   if (event == 2) then
+      local otherGuard
+      if (pUnit:GetEntry() == zoooor) then --we're zoooor, despawn ezza too
+         otherGuard = mod.GetCreatureInRange(pUnit, ezza)
+         if (otherGuard:IsAlive()) then otherGuard:Despawn(5, 5000) end
+      else
+         otherGuard = mod.GetCreatureInRange(pUnit, zoooor)
+         if (otherGuard:IsAlive()) then otherGuard:Despawn(5, 5000) end
+      end
+      pUnit:Despawn(5, 5000)
+   end
+end
+
+RegisterUnitEvent(mange, 1, Hounds_OnCombat)
+RegisterUnitEvent(malice, 1, Hounds_OnCombat)
+RegisterUnitEvent(mange, 2, Hounds_LeaveCombat)
+RegisterUnitEvent(malice, 2, Hounds_LeaveCombat)
+RegisterUnitEvent(mange, 4, Hounds_OnDeath)
+RegisterUnitEvent(malice, 4, Hounds_OnDeath)
+
+RegisterUnitEvent(zoooor, 18, Guards_OnSpawn)
+RegisterUnitEvent(ezza, 18, Guards_OnSpawn)
+RegisterUnitEvent(zoooor, 2, Guards_Reset)
+RegisterUnitEvent(ezza, 2, Guards_Reset)
+RegisterUnitEvent(zoooor, 4, Guards_Reset)
+RegisterUnitEvent(ezza, 4, Guards_Reset)

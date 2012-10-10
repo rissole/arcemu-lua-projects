@@ -1,0 +1,67 @@
+-----------------------
+--Made by Hypersniper--
+-------wow-v.com-------
+--For Burning Heavens--
+-----------------------
+
+QUICK_MOBS2 = {}
+
+QUICK_MOBS2.entries = { 
+regg = 12345,
+terr = 12346,
+chat = 12347,
+hell = 12348
+}
+
+function QUICK_MOBS2.Combat(pUnit)
+	local e = pUnit:GetEntry()
+	if (e == QUICK_MOBS2.entries.regg) then
+		local ref = RegisterTimedEvent("QUICK_MOBS2.Percentage", 1000, 0, pUnit, 50, 37662, "mt")
+		QUICK_MOBS2[tostring(pUnit)] = {ref}
+	elseif (e == QUICK_MOBS2.entries.terr) then
+		local ref = RegisterTimedEvent("QUICK_MOBS2.Percentage", 1000, 0, pUnit, 50, 41351, "mt")
+		local ref2 = RegisterTimedEvent("QUICK_MOBS2.ChainCast", 4000, 0, pUnit, 47809, "mt")
+		QUICK_MOBS2[tostring(pUnit)] = {ref,ref2}
+	elseif (e == QUICK_MOBS2.entries.chat) then
+		local ref = RegisterTimedEvent("QUICK_MOBS2.Percentage", 1000, 0, pUnit, 75, 34088, "mt")
+		local ref2 = RegisterTimedEvent("QUICK_MOBS2.Percentage", 1000, 0, pUnit, 25, 34088, "mt")
+		local ref3 = RegisterTimedEvent("QUICK_MOBS2.ChainCast", 5000, 0, pUnit, 19460, "mt")
+		QUICK_MOBS2[tostring(pUnit)] = {ref,ref2,ref3}
+	elseif (e == QUICK_MOBS2.entries.hell) then
+		local ref = RegisterTimedEvent("QUICK_MOBS2.Percentage", 1000, 0, pUnit, 80, 7139, pUnit)
+		local ref2 = RegisterTimedEvent("QUICK_MOBS2.Percentage", 1000, 0, pUnit, 20, 7139, pUnit)
+		local ref3 = RegisterTimedEvent("QUICK_MOBS2.Percentage", 1000, 0, pUnit, 50, 24669, "pos")
+		QUICK_MOBS2[tostring(pUnit)] = {ref,ref2,ref3}
+	end
+end
+
+function QUICK_MOBS2.Percentage(pUnit, pct, spell, target)
+	if (pUnit:GetHealthPct() <= pct and QUICK_MOBS2[tostring(pUnit)]["_"..pct] == nil) then
+		QUICK_MOBS2[tostring(pUnit)]["_"..pct] = true
+		if (target == "mt") then
+			pUnit:FullCastSpellOnTarget(spell, pUnit:GetMainTank())
+		elseif (target == "pos") then
+			local t = pUnit:GetMainTank()
+			pUnit:CastSpellAoF(t:GetX(), t:GetY(), t:GetZ(), spell)
+		else
+			pUnit:FullCastSpellOnTarget(spell, target)
+		end
+	end
+end
+
+function QUICK_MOBS2.ChainCast(pUnit, spell, target)
+	if (target == "mt") then target = pUnit:GetMainTank(); end
+	pUnit:FullCastSpellOnTarget(spell, target)
+end
+
+function QUICK_MOBS2.Reset(pUnit)
+	for _,v in pairs(QUICK_MOBS2[tostring(pUnit)]) do
+		RemoveTimedEvent(v)
+	end
+end
+
+for _,v in pairs(QUICK_MOBS2.entries) do
+	RegisterUnitEvent(v, 1, "QUICK_MOBS2.Combat")
+	RegisterUnitEvent(v, 2, "QUICK_MOBS2.Reset")
+	RegisterUnitEvent(v, 4, "QUICK_MOBS2.Reset")
+end

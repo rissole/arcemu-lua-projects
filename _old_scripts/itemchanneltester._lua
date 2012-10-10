@@ -1,0 +1,38 @@
+-------------------[Burning Heavens]-------------------
+              -- Scripted by Blackboy0 -- 
+                -- Item Channel Tester --
+-------------------[Burning Heavens]-------------------
+
+-----------------------
+-- GLOBALS --
+-----------------------
+
+local ITEMCHANNELTEST = 74772
+local Spell = 45576
+local DURATION = 10000
+local Player
+
+-------------------------------------------------------------
+-- CHANNEL TEST ITEM --
+-------------------------------------------------------------
+
+function ChannelTestItem_Use(item, event, player, pMisc)
+--[[Player = player
+local plr = player:GetRandomFriend()
+local npc = player:GetRandomEnemy()
+if (plr ~= nil and plr:IsPlayer() == false) then
+player:ChannelSpell(Spell, plr)
+plr:RegisterEvent("ChannelTestItem_Stop", DURATION, 1)
+else
+player:ChannelSpell(Spell, npc)
+npc:RegisterEvent("ChannelTestItem_Stop", DURATION, 1)
+end]]--
+item:SetSpellId(0, 20832)
+end
+
+function ChannelTestItem_Stop()
+	Player:SetUInt64Value(UNIT_FIELD_CHANNEL_OBJECT, 0);
+	Player:SetUInt32Value(UNIT_CHANNEL_SPELL, 0);
+end
+
+RegisterItemGossipEvent(ITEMCHANNELTEST, 1, "ChannelTestItem_Use")

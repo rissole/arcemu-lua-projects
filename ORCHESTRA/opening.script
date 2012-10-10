@@ -1,0 +1,86 @@
+-----------------------
+--Made by Hypersniper--
+-----Project Ronin-----
+-----------------------
+
+local par = getfenv(1)
+assert(type(par) == "table", "Orchestra: Critical error, parent module missing!")
+module(par._NAME..".OPENING", package.seeall)
+local self = getfenv(1)
+
+local nTorchE = 303; local nTorchS1 = 11413; local nTorchS2 = 11414;
+local nGrimE = 1010
+local vGrimSpawn = {-204.87, 2154.18, 79.76}
+local pGrimPath = { {-213.54, 2157.74, 79.76, 0}, {-219.31, 2148.88, 81.02, 0} }
+local vGrimTele = {-195.01, 2228.46, 94.43, 4.44}
+
+function Abort(id, reason)
+   print("Error, opening aborted: "..reason)
+   if (self[id].pGrim) then self[id].pGrim:Despawn(1, 0); end
+   self[id] = {} --setting event to 0
+end
+
+function Torch_Spawn(pGo)
+   if (pGo:GetSpawnId() ~= nTorchS1) then return; end
+   pGo:CreateLuaEvent(function() DoOpening(pGo) end, 500, 0)
+end
+
+function DoOpening(pGo) --pTorchS1 does this
+   if (pGo:GetInRangePlayersCount() == 0) then 
+      return;
+   end
+   local pTorchS2 = par.GetObjectSpawn(pGo, nTorchS2)
+   if (not pTorchS2) then print("Error, opening aborted: cannot find other torch"); pGo:RemoveEvents(); return; end
+   if (self[pGo:GetInstanceID()].pTorch ~= nil) then return; end
+   local x1, y1 = pGo:GetLocation()
+   local x2, y2 = pTorchS2:GetLocation()
+   --m(x-x1)+y1-y = 0
+   local m = (y1-y2) / (x1-x2)
+   for k, v in pairs(pGo:GetInRangePlayers()) do
+      local x, y = v:GetLocation()
+      if (math.abs(m * (x-x1) + y1 - y) < 5) then
+         self[pGo:GetInstanceID()].pTorch = pGo --basically the 'in progress' flag.
+         BeginOpening(v)
+         return
+      end
+   end
+end
+
+function BeginOpening(player)
+   local x,y,z = unpack(vGrimSpawn)
+   local u = player:SpawnCreature(nGrimE, x, y, z, 0, 14, 0, 39769)
+   par.EmoteEventChat(u, 12, 0, "Ahhh, guests. Welcome, welcome.", 1)
+   self[player:GetInstanceID()].pGrim = u
+   par.FaceUnit(u, player)
+   u:SetCombatCapable(1)
+   u:SetUInt32Value(UNIT_FIELD_FLAGS, UNIT_FLAG_NOT_ATTACKABLE_2)
+   local function OnPathNode(path)
+      if (path.currentNode == #(path.coords)) then ContinueOpening(path.unit) return; end
+      path:Continue()
+   end
+   local _path = PathLib.Create(u, 2.5, pGrimPath, OnPathNode)
+   _path:StartPath()
+end
+
+function ContinueOpening(pUnit)
+   local p = pUnit:GetClosestPlayer()
+   if (not p) then Abort(pUnit:GetInstanceID(), "Cannot find player"); return; end
+   par.FaceUnit(pUnit, p)
+   par.EmoteEventChat(pUnit, 12, 0, "I was hoping I'd get to play for a live audience... but the dead are so much more... captivating!", 1)
+   par.EmoteEventChat(pUnit, 16, 0, pUnit:GetName().." laughs.", 5000, 11, 3000)
+   par.EmoteEventChat(pUnit, 12, 0, "Still, if you'd like to witness the greatest live performance in the world, I'd be more than happy to accomodate you... but be careful, my friends can be so difficult to control at times...", 10000)
+   local function s15delay()
+      self[pUnit:GetInstanceID()].pTorch:RemoveEvents() --setting event to 2
+      pUnit:CastSpell(61456)
+      par.HyperActivate(par.EVENT1[pUnit:GetInstanceID()].p1, true)
+   end
+   local function s17delay()
+       pUnit:RegisterEvent(function() pUnit:SetFacing(vGrimTele[4]) end, 1000, 1)
+       pUnit:SetPosition(unpack(vGrimTele))
+   end
+   pUnit:RegisterEvent(s15delay, 15000, 1)
+   pUnit:RegisterEvent(s17delay, 16500, 1)
+end
+
+RegisterGameObjectEvent(nTorchE, 1, Torch_Spawn)
+RegisterUnitEvent(nGrimE, 18, function() return end)

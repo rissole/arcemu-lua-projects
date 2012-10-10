@@ -1,0 +1,809 @@
+-----------------------
+--Made by Hypersniper--
+----Duel Creatures-----
+-----------------------
+
+--Shared library for DuelCreatures
+
+local par = getfenv(1)
+assert(type(par) == "table", "DuelCreatures: Critical error, parent module missing!")
+module(par._NAME..".SHARED", package.seeall)
+local self = getfenv(1)
+self.par = par
+setmetatable(self, {__index = par})
+
+--PARAMETERS--
+
+--centre of the duel field. By default, the middle of Gurubashi Arena.
+ox, oy, oz = -13205.188476563, 272.10614013672, 21.86
+
+--END PARAMETERS--
+
+DUELS = {} --[nIndex] = { sDueller, sDuellee, nPhaseIndex, {seating}, nGamePhase, bFirstTurn, {eventchain} }
+CONSOLES = {} --[nDuelIndex][nConsole] = { 1GO, 2sUserName, 3{deck}, 4bMyTurn, 5{hand}, 6{graveyard}, 7{lastIntIds}, 8{turnextras}, 9{RFP}, 10nLifePoints }
+FIELDS = {} --[nIndex] = { fieldspell, { [nConsole] = { {monsters}, {spells} } } }
+
+--UPDATE FLAGS: If client updates, just modify these values.
+ITEM_FIELD_STACK_COUNT = 14
+OBJECT_END = 0x0006
+UNIT_FIELD_FLAGS = OBJECT_END + 0x0035
+UNIT_FLAG_NOT_ATTACKABLE_2 = 0x02
+UNIT_FLAG_NOT_SELECTABLE = 0x2000000
+
+--this is to make handy enums: eg. if T[1] = "DESC", then t["DESC"] = 1, too.
+local function add_invert_table(t)
+   local tempkeys = {}
+	for k,v in pairs(t) do table.insert(tempkeys, k) end
+   for i=1, #tempkeys do 
+      local key = tempkeys[i]
+      local value = t[tempkeys[i]]
+      t[value] = key
+   end
+end
+
+--Enums for DB data
+CARD_TYPE = 
+{
+   [1] = "Monster",
+   [2] = "Spell",
+   [3] = "Trap",
+}
+add_invert_table(CARD_TYPE)
+
+MONSTER_ELEMENT = 
+{
+   [1] = "Dark",
+   [2] = "Earth",
+   [3] = "Fire",
+   [4] = "Light",
+   [5] = "Water",
+   [6] = "Wind",
+}
+add_invert_table(MONSTER_ELEMENT)
+
+MONSTER_TYPE = 
+{
+   [1] = "Beast",
+   [2] = "Dragonkin",
+   [3] = "Demon",
+   [4] = "Elemental",
+   [5] = "Giant",
+   [6] = "Undead",
+   [7] = "Humanoid",
+   [8] = "Mechanical",
+}
+add_invert_table(MONSTER_TYPE)
+
+MONSTER_FLAGS = 
+{
+   [0x01] = "SPECIAL_SUMMONABLE", --has special summon conditions
+   [0x02] = "NOT_NORMAL_SUMMONABLE", --can NOT be normal/tribute summoned
+   [0x04] = "ACTIVATABLE_EFFECT", --has an effect that can be optionally activated during your turn
+}
+add_invert_table(MONSTER_FLAGS)
+
+MAGIC_FLAGS = 
+{
+   [0x01] = "NOT_ACTIVATABLE", --can NOT be activated by the player - the card's effect is ONLY triggered at specific events.
+   [0x02] = "NOT_MANDATORY", --a choice is offered to activate this card's effect
+}
+add_invert_table(MAGIC_FLAGS)
+
+SPELL_TYPE =
+{
+   [1] = "Normal",
+   [2] = "Continuous",
+   [3] = "Equip",
+   [4] = "Field",
+   [5] = "Quick-play",
+   [6] = "Ritual",
+}
+add_invert_table(SPELL_TYPE)
+
+TRAP_TYPE =
+{
+   [1] = "Normal",
+   [2] = "Continuous",
+   [3] = "Counter",
+}
+add_invert_table(TRAP_TYPE)
+
+EVENTS =
+{
+--	ID		NAME					     ADD. ARGS (event, dcid given to all)	    DESC
+   [1] = "PRE_SUMMON",          -- targetSlot, mode							 Occurs just before a monster is summoned to the field, "return false" for the monster not to be summoned.
+   [2] = "ON_SUMMON",           -- monCardObj                            Occurs after a summon or set.
+   [3] = "ON_MODE_SWITCH",      -- monCardObj, targetMode                Occurs when monster's mode is switched. "return false" to cancel the switch.
+   [4] = "ON_FLIP_SUMMON",      -- monCardObj, bAtkMode                  Occurs after successful flip summon, IN SOME CASES IT WILL OCCUR AT THE SAME TIME AS on_mode_switched, bAtkMode => whether it's being forced into attack mode
+   [5] = "PRE_SPECIAL_SUMMON",  -- targetSlot, mode                      Occurs after selecting "Yes, Special Summon". In this case, the registered function must summon the monster, through SummonMonsterFromHand.
+   [6] = "ON_EFFECT_ACTIVATED", -- monCardObj                            Only applies to monsters with "ACTIVATABLE_EFFECT" flag. This event occurs when the effect is activated from the monster on the field.
+   [7] = "ON_DISCARD",          -- cardObj                               Occurs when card goes from field -> graveyard. cardObj is nil when a field spell card is discarded.
+   [8] = "ON_MAGIC_ACTIVATED",  --                                       Occurs when a spell/trap is activated, for example, when it is played from the hand/flipped face-up.
+   [9] = "ON_STANDBY_PHASE",    --                                       Occurs at the standby phase.
+  [10] = "ON_DRAW_CARD",        --                                       Occurs when a card is drawn.
+  [11] = "ON_END_PHASE",        --                                       Occurs during the End Phase (after a player ends their turn).
+  [12] = "ON_ATTACK",           -- monCardAtker, monCardVictim           Occurs when an attack is declared. "return false" to cancel the attack.
+}
+add_invert_table(EVENTS)
+
+--this makes the card object part of shared, but kept within its own file.
+local obj, msg = loadfile("scripts/DuelCreatures/DC_CardObject.script")
+if (not obj) then 
+   print(msg)
+else
+   setfenv(obj, self)
+   obj()
+   print("Successfully loaded script file: \"DC_CardObject.script\"") 
+end
+
+--[[
+     Manual Unit.CalcRadAngle not based on unit
+--]]
+function calcRadAngle(x1, y1, x2, y2)
+   local dx = x2 - x1;
+   local dy = y2 - y1;
+   local angle = 0;
+   if (dx < 0) then
+      angle = math.atan(dy / dx) + math.pi;
+   elseif (dy < 0) then
+      angle = math.atan(dy / dx) + (2 * math.pi);
+   else
+      angle = math.atan(dy / dx);
+   end
+   return angle;
+end
+
+--[[
+     Simple message sending with optional sound.
+--]]
+function SendMsg(p, msg, snd)
+   msg = msg
+   p:SendAreaTriggerMessage(msg)
+   p:SendBroadcastMessage(msg)
+   if (snd) then p:PlaySoundToPlayer(snd); end
+end
+
+--[[
+     Sends a message to the duelists in the specified duel index, can also play a sound.
+--]]
+function SendMessageToDuelists(index, msg, s)
+   local sP1 = DUELS[index][1]
+   local sP2 = DUELS[index][2]
+   local pP1 = GetPlayer(sP1)
+   local pP2 = GetPlayer(sP2)
+   if (not pP1 or not pP2) then return; end
+   SendMsg(pP1, msg, s)
+   SendMsg(pP2, msg, s)
+end
+
+--[[
+     Sends a message to everyone in the specified duel index, can also play a sound.
+--]]
+function SendMessageToDuel(index, msg, s)
+   local sP1 = DUELS[index][1]
+   local pP1 = GetPlayer(sP1)
+   if (not pP1) then return; end
+   for k,v in pairs(pP1:GetInRangePlayers()) do
+      if (v:GetPhase() == pP1:GetPhase()) then
+         SendMsg(v, msg, s)
+      end
+   end
+   SendMsg(pP1, msg, s)
+end
+
+--[[
+     Returns the index (key) of the duel the player is currently in + true/false if/if not duellER.
+     Returns nil if not involved in a duel.
+--]]
+function GetDuelIndex(sName)
+   for index, sub in pairs(DUELS) do
+      if (sub[1] == sName) then --duellER
+         return index, true
+      elseif (sub[2] == sName) then --duellEE
+         return index, false
+      end
+   end
+   return nil
+end
+
+--[[
+     Returns the key of DUELS that has the provided phase index, or nil.
+--]]
+function GetDuelByPhaseIndex(nPhaseI)
+   for index, sub in pairs(DUELS) do
+      if (sub[3] == nPhaseI) then
+         return index
+      end
+   end
+   return nil
+end
+
+--[[
+     Returns DuelCreature ID given a card's Item ID, nil if not a card.
+--]]
+function ItemIDToDCID(itemid)
+   for DCID, subt in pairs(DC_DB_CACHE) do
+      if (subt.ItemID == itemid) then
+         return DCID
+      end
+   end
+   return nil
+end
+
+--[[
+     Returns a table with every card the player has, regardless of deck bag ownership.
+     Enter the deckBag slot ID if you want to SKIP the deck bag for counting. -1 if you just want all cards/no deck bag.
+     Format: deck[1-n] = DCID
+--]]
+function GetAllCards(player, deckBagToSkip)
+   local deck = {}
+   for i=19,38 do
+      local item = player:GetInventoryItem(-1, i)
+      if (item and i ~= deckBagToSkip) then
+         if (item:IsContainer()) then
+            for j=0,35 do
+               local item = player:GetInventoryItem(i, j)
+               if (item and ItemIDToDCID(item:GetEntryId()) ~= nil) then
+                  local stack = 1
+                  if (item:GetUInt32Value(ITEM_FIELD_STACK_COUNT) > 0) then stack = item:GetUInt32Value(ITEM_FIELD_STACK_COUNT); end
+                  for k=1, stack do
+                     table.insert(deck, ItemIDToDCID(item:GetEntryId()))
+                  end
+               end
+            end
+         else
+            if (ItemIDToDCID(item:GetEntryId()) ~= nil) then
+               local stack = 1
+               if (item:GetUInt32Value(ITEM_FIELD_STACK_COUNT) > 0) then stack = item:GetUInt32Value(ITEM_FIELD_STACK_COUNT); end
+               for k=1, stack do
+                  table.insert(deck, ItemIDToDCID(item:GetEntryId()))
+               end
+            end
+         end
+      end
+   end
+   return deck
+end
+
+--[[
+     Returns a table with every card the player has in their deck bag.
+     Player MUST have a deck bag for this method!
+     Format: deck[1-n] = DCID
+--]]
+function GetDeckCards(player, nDeckBag)
+   local deck = {}
+   for i=0,35 do
+      local item = player:GetInventoryItem(nDeckBag, i)
+      if (item) then
+         local dcid = ItemIDToDCID(item:GetEntryId())
+         if (dcid ~= nil) then
+            local stack = 1
+            if (item:GetUInt32Value(ITEM_FIELD_STACK_COUNT) > 0) then stack = item:GetUInt32Value(ITEM_FIELD_STACK_COUNT); end
+            for j=1, stack do
+               table.insert(deck, dcid)
+            end
+         end
+      end
+   end
+   return deck
+end
+
+--[[
+     Creates a gossip menu, showing all info for the card with the specified DCID/cardobj (argument 1).
+     The menu is sent from sender, and sent to player.
+     
+     If backintid is not nil, this intid will be used when the back button is pressed.
+     Additionally the back button will not be shown if backintid is nil.
+     
+     ... is additional buttons. Must be added in pairs of 2: text, intid, text, intid...
+--]]
+function ShowCardInfo(obj, sender, player, backintid, ...)
+   local dcid
+   local proto
+   if (type(obj) == "number") then 
+      dcid = obj
+      proto = DC_DB_CACHE[dcid]
+   elseif (type(obj) == "table" and obj.id) then
+      proto = obj.m_proto
+   end
+   if (not proto) then return; end
+   --assuming using ArcScripts >= 1346 for now, makes this method much simpler
+   sender:GossipCreateMenu(70011, player, 0) --<You take a closer look at the card>
+   if (proto.Type == CARD_TYPE.Monster) then
+		sender:GossipMenuAddItem(0, proto.Name, 1, 0)
+		sender:GossipMenuAddItem(0, proto.M_Level.." stars", 1, 0)
+		sender:GossipMenuAddItem(0, string.upper(tostring(CARD_TYPE[proto.Type])).." CARD", 1, 0) --the tostrings here account for nil, if someone has bad DB
+		sender:GossipMenuAddItem(0, tostring(MONSTER_ELEMENT[proto.M_Element]).." - "..tostring(MONSTER_TYPE[proto.M_Type]), 1, 0)
+      sender:GossipMenuAddItem(7, proto.EffectText, 1, 0)
+      if (type(obj) == "table") then
+         sender:GossipMenuAddItem(9, "Attack: "..obj.m_atk.." (Base: "..proto.M_Attack..")", 1, 0)
+         sender:GossipMenuAddItem(9, "Defense: "..obj.m_def.." (Base: "..proto.M_Defense..")", 1, 0)
+      else
+         sender:GossipMenuAddItem(9, "Attack: "..proto.M_Attack, 1, 0)
+         sender:GossipMenuAddItem(9, "Defense: "..proto.M_Defense, 1, 0)
+      end
+	elseif (proto.Type == CARD_TYPE.Spell) then --spell
+		sender:GossipMenuAddItem(0, proto.Name, 1, 0)
+		sender:GossipMenuAddItem(0, string.upper(tostring(CARD_TYPE[proto.Type])).." CARD", 1, 0)
+      sender:GossipMenuAddItem(0, tostring(SPELL_TYPE[proto.S_Type]).." spell card", 1, 0)
+		sender:GossipMenuAddItem(7, proto.EffectText, 1, 0)
+   elseif (proto.Type == CARD_TYPE.Trap) then --trap
+		sender:GossipMenuAddItem(0, proto.Name, 1, 0)
+		sender:GossipMenuAddItem(0, string.upper(tostring(CARD_TYPE[proto.Type])).." CARD", 1, 0)
+      sender:GossipMenuAddItem(0, tostring(TRAP_TYPE[proto.S_Type]).." trap card", 1, 0)
+		sender:GossipMenuAddItem(7, proto.EffectText, 1, 0)
+	end
+   if (#arg % 2 == 0) then --if everything was kept in pairs as you should...
+      for i=1, #arg, 2 do
+         sender:GossipMenuAddItem(9, arg[i], arg[i+1], 0)
+      end
+   end
+   if (backintid ~= nil) then
+      sender:GossipMenuAddItem(0, "Back", backintid, 0)
+   end
+   sender:GossipSendMenu(player)
+end
+
+--[[
+     Creates a new subtable for use. Just a convenience function.
+--]]
+function InitField(index, nConsole)
+   if (not FIELDS[index]) then
+      FIELDS[index] = { 0, { [nConsole] = { {}, {} } } }
+   else
+      FIELDS[index][2][nConsole] = { {}, {} }
+   end
+end
+
+--[[
+     Returns a colour string for the specific card type. Monster = black, spell = green, trap = purple.
+--]]
+function GetTypeColour(_type)
+   local colourtext = ""
+   if (_type == CARD_TYPE.Spell) then colourtext = "|cFF006600"; elseif (_type == CARD_TYPE.Trap) then colourtext = "|cFF660066"; end
+   return colourtext
+end
+
+--[[
+     Returns 2 if 1 is passed, or 1 if 2 is passed.
+     For retrieving opponent's console.
+--]]
+function GetOppCon(nMyConsole)
+   if (nMyConsole == 1) then return 2; else return 1; end
+end
+
+--Just an accessor to CONSOLES table
+function GetConObj(index, nCon)
+   return CONSOLES[index][nCon][1]
+end
+
+--[[
+     Returns true if the DCID proto.Flags has the specified flag.
+--]]
+function HasFlag(dcid, flag)
+   local proto = DC_DB_CACHE[dcid]
+   if (proto and bit_and(proto.Flags, flag)) then
+      return true
+   else
+      return false
+   end
+end
+
+--[[
+     Returns the player to their main menu according to the Game phase.
+     The command can be called in 2 ways: MainMenu(player) or MainMenu(index, nConsole)
+--]]
+function MainMenu(arg1, arg2)
+   local index, nConsole, player
+   if (arg2 == nil) then
+      assert(type(arg1) == "userdata" and arg1:IsPlayer(), "MainMenu error: invalid player")
+      player = arg1; index, nConsole = GetDuelIndex(player:GetName())
+   else
+      index = arg1; player = GetPlayer(DUELS[arg1][arg2])
+      assert(player ~= nil, "MainMenu error: invalid player")
+   end
+   if (not index) then return; end
+   if (nConsole) then nConsole = 1; else nConsole = 2; end
+   if (CONSOLES[index][nConsole][8]["AP"] == true) then return; end --if we are not restricted from console use, stop here.
+   local nGPhase = DUELS[index][5]
+   local pGo = CONSOLES[index][nConsole][1]
+   CONSOLES[index][nConsole][7] = {}
+   if (CONSOLES[index][nConsole][4] == true) then --it's my turn
+      local nGPhase = DUELS[index][5]
+      if (nGPhase == 0) then --DRAW PHASE
+         par.CONSOLE.OnConsoleInput(pGo, 2, player, 0, 70, "")
+      elseif (nGPhase == 1 or nGPhase == 3) then --A MAIN PHASE
+         par.CONSOLE.OnConsoleInput(pGo, 2, player, 0, 80, "")
+      elseif (nGPhase == 2) then --BATTLE PHASE
+         par.CONSOLE.OnConsoleInput(pGo, 2, player, 0, 110, "")
+      end
+   else --NOT MY TURN, only allow field viewing
+      par.CONSOLE.OnConsoleInput(pGo, 2, player, 0, 20, "")
+   end
+   return true
+end
+
+--[[
+     Increments the game phase.
+--]]
+function NextPhase(index, nConsole)
+   DUELS[index][5] = DUELS[index][5] + 1
+   CONSOLES[index][nConsole][7] = {}
+end
+
+--[[
+     Returns true if the card passes the filters described in cFilters.
+     Further info @ OfferChoice.
+--]]
+function FiltersPass(card, cFilters)
+   assert(type(cFilters) == "table" and card, "FiltersPass error: invalid argument(s)")
+   if (type(card) == "number") then --we got sent a DCID... check proto only
+      for k,v in pairs(cFilters) do
+         local proto = DC_DB_CACHE[card]
+         if (proto[k] ~= v) then
+            return false
+         end
+      end
+   elseif (type(card) == "table") then --we got sent a card object
+      if (type(cFilters.m_proto) == "table") then
+         for k,v in pairs(cFilters.m_proto) do
+            local proto = card.m_proto
+            if (proto[k] ~= v) then
+               return false
+            end
+         end
+      end
+      for k,v in pairs(cFilters) do
+         if (card[k] ~= v and k ~= "m_proto") then
+            return false
+         end
+      end
+   end
+   return true
+end
+
+--really just a useless function so I remember what this line of code does.
+function AlreadyChosen(cholder, i)
+   return (cholder["chosen"..i] == true)
+end
+
+--[[
+     Offer a choice of cards...
+     sender = sending object, player = menu-receiving player.
+     fromWho = 1 or 2, challengER/challengEE.
+     fromWhere = "hand", "field", "graveyard"
+     cFilters = Table containing filters that the cards chosen must satisfy.
+      -For fromWhere == hand or fromWhere == graveyard, this can only be a table in the form [proto fields] = value.
+      -For fromWhere == field, you can have one subtable called 'm_proto' in the form [proto fields] = value.
+       Otherwise, it will be a table in the form [card fields] = value.
+     number = how many cards to select.
+     finalfunc = the function that will occur when all's done and said. Arguments are sender, player, {choices}
+     textid = the npc_text value that you want to appear on the menu. Defaults to "Select a card:" (70017)
+--]]
+function OfferChoice(sender, player, fromWho, fromWhere, cFilters, number, finalfunc, textid)
+   assert(sender and player, "OfferChoice error: invalid sender/player")
+   local index, nConsole = GetDuelIndex(player:GetName())
+   if (not index) then return; end
+   if (nConsole) then nConsole = 1; else nConsole = 2; end
+   local cholder = CONSOLES[index][nConsole][8]["CH"]
+   textid = textid or 70017
+   sender:GossipCreateMenu(textid, player, 0) --Select a card:
+   local id = 1
+   if (fromWho ~= nil) then
+      assert(fromWho == 1 or fromWho == 2, "OfferChoice error: invalid fromWho argument")
+      assert(fromWhere == "hand" or fromWhere == "field" or fromWhere == "graveyard", "OfferChoice error: invalid fromWhere argument")
+      assert(type(cFilters) == "table", "OfferChoice error: invalid cFilters argument")
+      assert(type(finalfunc) == "function", "OfferChoice error: invalid final function argument")
+      CONSOLES[index][nConsole][8]["CH"] = { 
+         ["choices"] = {}, ["fromWhere"] = fromWhere, ["fromWho"] = fromWho, ["cFilters"] = cFilters, ["number"] = number, ["finalfunc"] = finalfunc
+      }
+      cholder = CONSOLES[index][nConsole][8]["CH"]
+   else
+      fromWho = cholder.fromWho; fromWhere = cholder.fromWhere; cFilters = cholder.cFilters; number = cholder.number;
+   end
+   local s="s"; if (number-#cholder["choices"] == 1) then s=""; end
+   sender:GossipMenuAddItem(0, "You have: "..number-#cholder["choices"].." card"..s.." left to choose", 1, 0)
+   if (fromWhere == "hand") then
+      for i,v in ipairs(CONSOLES[index][fromWho][5]) do
+         if (FiltersPass(v, cFilters) and not AlreadyChosen(cholder, i)) then
+            sender:GossipMenuAddItem(0, DC_DB_CACHE[v].Name, 105, 0)
+            cholder[id] = {i,v}
+            id = id + 1
+         end
+      end
+   elseif (fromWhere == "field") then
+      for i=1, 5 do
+         local v = FIELDS[index][2][fromWho][1][i]
+         local proto = nil
+         local mode = ""
+         local name = ""
+         local iid = 105
+         local colour = ""
+         if (v and FiltersPass(v, cFilters) and not AlreadyChosen(cholder, i)) then
+            proto = v.m_proto --duel creature always has proto
+            if (v.m_mode == 0) then mode = "(ATK)"; else mode = "(DEF)"; end
+            name = proto.Name
+            colour = GetTypeColour(proto.Type)
+            if (v.m_face == 1 and fromWho ~= nConsole) then 
+               name = "(Face Down)"
+               colour = ""
+            elseif (v.m_face == 1) then
+               name = "(Face Down) - "..proto.Name
+            end
+            sender:GossipMenuAddItem(7, mode..colour.."["..name.."]", iid, 0)
+            cholder[id] = {i,v}
+            id = id + 1
+         end
+      end
+      for i=1, 5 do
+         local v = FIELDS[index][2][fromWho][2][i]
+         local proto = nil
+         local name = ""
+         local iid = 105
+         local colour = ""
+         if (v and FiltersPass(v, cFilters) and not AlreadyChosen(cholder, i)) then
+            proto = v.m_proto
+            name = proto.Name
+            colour = GetTypeColour(proto.Type)
+            if (v.m_face == 1 and fromWho ~= nConsole) then 
+               name = "(Face Down)"
+               colour = ""
+            elseif (v.m_face == 1) then
+               name = "(Face Down) - "..proto.Name
+            end
+            sender:GossipMenuAddItem(7, colour.."["..name.."]", iid, 0)
+            cholder[id] = {i,v}
+            id = id + 1
+         end
+      end
+   elseif (fromWhere == "graveyard") then
+      for i,v in ipairs(CONSOLES[index][fromWho][6]) do
+         if (FiltersPass(v, cFilters) and not AlreadyChosen(cholder, i)) then
+            sender:GossipMenuAddItem(0, DC_DB_CACHE[v].Name, 105, 0)
+            cholder[id] = {i,v}
+            id = id + 1
+         end
+      end
+   end
+   if (id == 1) then --no available options
+      CONSOLES[index][nConsole][8]["CH"] = nil
+      sender:GossipCreateMenu(70017, player, 0) --Select a card:
+      sender:GossipMenuAddItem(0, "No more available cards for choice.", 1115, 0)
+   end
+   sender:GossipSendMenu(player)
+end
+
+--resumes choice selection based on the static table
+function ContinueChoice(sender, player, idChosen)
+   if (idChosen == 0) then OfferChoice(sender, player); return; end --this = "no action" (selecting the # cards left option)
+   local index, nConsole = GetDuelIndex(player:GetName())
+   if (not index) then return; end
+   if (nConsole) then nConsole = 1; else nConsole = 2; end
+   local ch = CONSOLES[index][nConsole][8]["CH"]
+   assert(sender and player and ch[idChosen], "ContinueChoice error: invalid sender/player/id chosen")
+   local id, object_choice = ch[idChosen][1], ch[idChosen][2]
+   ch["chosen"..id] = true
+   table.insert(ch["choices"], object_choice)
+   if (#ch["choices"] == ch["number"]) then
+      ch["finalfunc"](sender, player, ch["choices"])
+      CONSOLES[index][nConsole][8]["CH"] = nil
+   else
+      OfferChoice(sender, player) --continue the choice.
+   end
+end
+
+--The link to the script mgr - event and dcid are passed directly to the target function,
+--while the function is executed in its own environment with a couple of custom vars of its own.
+function CALL_CARD_EVENT(event, dcid, index, nConsole, ...)
+   local player = GetPlayer(DUELS[index][nConsole])
+   local ocon = GetOppCon(nConsole)
+   local player2 = GetPlayer(DUELS[index][ocon])
+   local funcenv = {_GO = CONSOLES[index][nConsole][1], _INDEX = index, _CONSOLE = nConsole, _PLAYER = player,
+                    _O_GO = CONSOLES[index][ocon][1], _O_CONSOLE = ocon, _O_PLAYER = player2}
+   setmetatable(funcenv, {__index = par.SCRIPTMGR})
+   local chain = DUELS[index][7]
+   
+end
+
+--[[
+Need DefaultEvent(event, params) for each event.
+
+triggersForWho argument in RegisterCardEvent - nil/"self" => triggers when HE activates the event, "any" => triggers when any DC activates the event.
+firstly the DC's card event is added to the bottom of the chain
+then loops through magic and monster cards on the field and checks if they have an "any" summon trigger.
+of course, the turn player's cards will get prioritised and added to top of chain.
+
+DefaultHandleEvent is stored at the bottom of the spell chain
+call card event will BeginChain if there are any events to call
+if there are any events to call in the spell chain, call card event will return false
+BeginChain will execute the first item and pop it from the spell list.
+The called script function will execute Resolve to mark when it has resolved.
+Resolve will take arg bContinue, if true, then the chain will pop this function and keep going; if false, then the chain will be cleared and ended.
+If the chain continues to the end, ie no events want to interrupt regular behaviour, then the bottom chain function will be called;
+it will be the DefaultHandleEvent.
+]]
+
+function BeginChain()
+
+end
+
+--Returns all monsters on the field, in an array format, that pass the card filters provided
+function GetMonstersOnField(index, nConsole, cFilters)
+   assert(type(cFilters) == "table" and FIELDS[index] and FIELDS[index][2][nConsole], "GetMonstersOnField error: Invalid arguments")
+   local monsters = FIELDS[index][2][nConsole][1] --all monsters
+   local ret = {}
+   for i=1,5 do
+      local v = monsters[i]
+      if (v and FiltersPass(v, cFilters)) then
+         table.insert(ret, v)
+      end
+   end
+   return ret
+end
+
+--Returns all magics on the field, in an array format, that pass the card filters provided
+function GetMagicOnField(index, nConsole, cFilters)
+   assert(type(cFilters) == "table" and FIELDS[index] and FIELDS[index][2][nConsole], "GetMagicOnField error: Invalid arguments")
+   local magics = FIELDS[index][2][nConsole][2] --all magics
+   local ret = {}
+   for i=1,5 do
+      local v = magics[i]
+      if (v and FiltersPass(v, cFilters)) then
+         table.insert(ret, v)
+      end
+   end
+   return ret
+end
+
+--Convenience function for summoning from hand
+function SummonMonsterFromHand(index, nConsole, slot, dcid, mode, bSpecial)
+   if (mode == 0) then
+      par.FIELD.SummonMonster(index, nConsole, slot, dcid, bSpecial)
+   else
+      par.FIELD.SetCard(index, nConsole, slot, dcid, bSpecial)
+   end
+   par.CONSOLE.RemoveCardFromHand(index, nConsole, dcid)
+end
+
+--[[
+     Removes a card from play.
+     fromWhere: "hand", "field" or "graveyard"
+     dc is DCID if hand or gy, card obj otherwise.
+--]]
+function RemoveCardFromPlay(index, nConsole, dc, fromWhere)
+   local rfp = CONSOLES[index][nConsole][9]
+   if (fromWhere == "hand") then
+      par.CONSOLE.RemoveCardFromHand(index, nConsole, dc)
+      table.insert(rfp, dc)
+   elseif (fromWhere == "field") then
+      if (type(dc) == "table" and dc.id) then
+         dc:Delete()
+         table.insert(rfp, dc)
+      end
+   elseif (fromWhere == "graveyard") then
+      par.CONSOLE.RemoveCardFromGraveyard(index, nConsole, dc)
+      table.insert(rfp, dc)
+   end
+end
+
+--[[
+     Modifies lifepoints. amount lifepoints are removed from the specified duel index / console number. AMOUNT CAN BE NEGATIVE TO ADD LIFEPOINTS.
+     This method should always be used as it also updates the visuals for the duelists+spectators.
+     Returns false if the duel ends as a result of this lifepoint removal.
+--]]
+function RemoveLifepoints(index, nConsole, amount)
+   CONSOLES[index][nConsole][10] = CONSOLES[index][nConsole][10] - amount
+   if (CONSOLES[index][nConsole][10] <= 0) then
+      CONSOLES[index][nConsole][10] = 0
+      par.CONSOLE.EndDuel(index, DUELS[index][nConsole], false)
+      return false
+   else
+      UpdateLifepoints(index)
+      return true
+   end
+end
+
+--[[
+     Performs initial visual setup for lifepoints using worldstates.
+     Alternatively, if deinit is true, it will hide the worldstate visual.
+--]]
+function InitiateLifepoints(index, deinit)
+   local pP1 = GetPlayer(DUELS[index][1])
+   local pP2 = GetPlayer(DUELS[index][2])
+   assert(pP1 and pP2, "InitiateLifePoints error: invalid players")
+   local p = LuaPacket:CreatePacket(706,18)
+   p:WriteULong(489)
+   p:WriteULong(3277)
+   p:WriteULong(0)
+   p:WriteUShort(1)
+   p:WriteULong(2339)
+   if (deinit) then
+      p:WriteULong(0)
+   else
+      p:WriteULong(1)
+   end
+   pP1:SendPacketToPlayer(p)
+   pP2:SendPacketToPlayer(p)
+   for i,v in ipairs(DUELS[index][4]) do
+      local pl = GetPlayer(v)
+      if (pl and pl:IsInWorld()) then
+         pl:SendPacketToPlayer(p)
+      end
+   end
+   
+   if (not deinit) then UpdateLifepoints(index); end
+end
+
+--Updates lifepoint worldstate visuals.
+function UpdateLifepoints(index)
+   local pP1 = GetPlayer(DUELS[index][1])
+   local pP2 = GetPlayer(DUELS[index][2])
+   assert(pP1 and pP2, "UpdateLifepoints error: invalid players")
+   local p = LuaPacket:CreatePacket(707, 8)
+   p:WriteULong(1581)
+   p:WriteULong(CONSOLES[index][1][10])
+   pP1:SendPacketToPlayer(p)
+   local p2 = LuaPacket:CreatePacket(707, 8)
+   p2:WriteULong(1601)
+   p2:WriteULong(CONSOLES[index][2][10])
+   pP1:SendPacketToPlayer(p2)
+   
+   for i,v in ipairs(DUELS[index][4]) do
+      local pl = GetPlayer(v)
+      if (pl and pl:IsInWorld()) then
+         pl:SendPacketToPlayer(p)
+         pl:SendPacketToPlayer(p2)
+      end
+   end
+   
+   p = LuaPacket:CreatePacket(707, 8)
+   p:WriteULong(1581)
+   p:WriteULong(CONSOLES[index][2][10])
+   pP2:SendPacketToPlayer(p)
+   p = LuaPacket:CreatePacket(707, 8)
+   p:WriteULong(1601)
+   p:WriteULong(CONSOLES[index][1][10])
+   pP2:SendPacketToPlayer(p)
+end
+
+--sender obj offers the player a yes/no gossip choice for activating a trap/spell card.
+function OfferActivate(sender, player, dcid)
+   assert(sender and player and DC_DB_CACHE[dcid], "OfferActivate error: invalid sender/player/dcid")
+   
+end
+
+--Returns true if the Game Phase specified is either Main Phase 1 or Main Phase 2.
+function IsMainPhase(GPhase)
+   return (GPhase == 1 or GPhase == 3)
+end
+
+--Returns the current game phase.
+function GetCurrentPhase(index)
+   return DUELS[index][5]
+end
+
+--Restricts access to the console at the specified index and console number. nConsole can be -1 for both players.
+--This is used when animations are in progress and you don't want them interrupted.
+--This also closes their current gossip menu and clears backs so that they really don't do anything.
+function RestrictConsoleAccess(index, nConsole, bRestrict)
+   assert(CONSOLES[index] and (CONSOLES[index][nConsole] or nConsole == -1) and type(bRestrict) == "boolean", "RestrictConsoleAccess error: invalid argument(s)")
+   if (nConsole == -1) then
+      for con = 1,2 do
+         CONSOLES[index][con][8]["AP"] = bRestrict
+         if (bRestrict == true) then
+            GetPlayer(CONSOLES[index][con][2]):GossipComplete()
+            CONSOLES[index][con][7] = {}
+         else
+            MainMenu(GetPlayer(CONSOLES[index][con][2]))
+         end
+      end
+   else
+      CONSOLES[index][nConsole][8]["AP"] = bRestrict
+      if (bRestrict == true) then
+         GetPlayer(CONSOLES[index][nConsole][2]):GossipComplete()
+         CONSOLES[index][nConsole][7] = {}
+      else
+         MainMenu(GetPlayer(CONSOLES[index][nConsole][2]))
+      end
+   end
+end

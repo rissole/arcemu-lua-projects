@@ -1,0 +1,8 @@
+﻿## Interface: 33000
+## Title: CommTyping
+## Notes: Communicator module for Mastermind Solarwrench boss.
+## Author: Hypersniper
+## Version: 1.0
+## Dependencies: Communicator
+CommTyping.xml
+CommTyping.lua

@@ -1,0 +1,9 @@
+All of my server scripts that I made over the years in Lua using Arcemu (World of Warcraft server emulator).
+
+Most scripts are self-documented. A lot were made for projects that have long since disappeared. They will remain here for posterity.
+
+Main projects that I can remember right now:
+-DuelCreatures: A Yu-Gi-Oh duel game implemented in the World of Warcraft world.
+-Ronin: A project undertaken with a friend overseas that I've lost contact with. 'BladeRain' was his username on wow-v, first name Matt if I remember correctly.
+		It was an ambitious project that recreated the game world entirely with a PvP focus with a low level cap; requiring much content made from scratch.
+-Burning Heavens: A project lead by 'BlackBoy0' from wow-v. It was a project that aimed to implement a Demon Hunter class and associated content.

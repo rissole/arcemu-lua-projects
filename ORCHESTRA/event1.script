@@ -1,0 +1,150 @@
+-----------------------
+--Made by Hypersniper--
+-----Project Ronin-----
+-----------------------
+
+local par = getfenv(1)
+assert(type(par) == "table", "Orchestra: Critical error, parent module missing!")
+module(par._NAME..".EVENT1", package.seeall)
+local self = getfenv(1)
+
+local nRevenant = 1000 --EVENT 1 CREATURES
+local nHorror = 1001
+local nWretch = 1002
+local nSniper = 1003
+local nMarksman = 1004
+local nWarrior = 1005 --END EVENT 1 CREATURES
+local nLDoorE	= 810; local nLDoorS = 11429;
+local nDoorE = 280; local nDoorS = 11370; local nDoorS2 = 11965;
+local nBarrelE = 268; local nBarrelS = 11418;
+local CreatureArea = {-188.32, 2097.31, 77, -210.46, 2143.23, 91} --x1, y1, z1, x2, y2, z2
+
+--[[ Self clarification on these events:
+   nil - not started - trigger event checks until criteria reached
+   1 - in progress - trigger event still fires but cancels as the event is in progress
+   2 - finished - trigger event removed
+]]
+
+function GetEvent1CreaturesWithEntries(pUnit, ...)
+   local tUnits = par.GetAllWithEntries(pUnit, ...)
+   return par.RefineUnitsToArea(tUnits, CreatureArea)
+end
+
+function Door_Spawn(pGo)
+   if (pGo:GetSpawnId() == nDoorS) then
+      pGo:SetUInt32Value(GAMEOBJECT_FLAGS, 0x1)
+      self[pGo:GetInstanceID()].p1 = pGo --p1 = entrance door
+   end
+   if (pGo:GetSpawnId() == nDoorS2) then
+      pGo:SetUInt32Value(GAMEOBJECT_FLAGS, 0x1)
+      par.EVENT2[pGo:GetInstanceID()].p2 = pGo --p2 = exit door
+   end
+end
+
+function LDoor_Spawn(pGo)
+   if (pGo:GetSpawnId() == nLDoorS) then
+      pGo:SetUInt32Value(GAMEOBJECT_FLAGS, 0x1)
+      self[pGo:GetInstanceID()].p2 = pGo --p2 = exit door
+   end
+end
+
+function Barrel_Spawn(pGo)
+   if (pGo:GetSpawnId() ~= nBarrelS) then return; end
+   self[pGo:GetInstanceID()].pBarrel = pGo
+   pGo:CreateLuaEvent(function() Event1Trigger(pGo) end, 500, 0)
+end
+
+function SetupBoneWarrior(pUnit)
+   pUnit:SetCombatCapable(1)
+   pUnit:SetUInt32Value(UNIT_FIELD_FLAGS, UNIT_FLAG_NOT_SELECTABLE)
+   pUnit:SetFaction(35)
+   pUnit:SetUInt32Value(UNIT_NPC_EMOTESTATE, 403)
+end
+
+function Event1Trigger(pGo)
+   if (self[pGo:GetInstanceID()].status == nil) then --if not started
+      local p = nil
+      for k,v in pairs(pGo:GetInRangePlayers()) do
+         if (pGo:GetDistanceYards(v) <= 7 and v:IsInWorld() and v:IsAlive()) then
+            p = v
+            break
+         end
+      end
+      if (p ~= nil) then
+         for k,v in pairs(GetEvent1CreaturesWithEntries(p, nRevenant, nHorror, nWretch, nSniper, nMarksman)) do
+            v:AttackReaction(p, 1, 0)
+            v:SetUInt32Value(UNIT_FIELD_FLAGS, 0)
+         end
+         self[pGo:GetInstanceID()].status = 1 --in progress now.
+         par.CloseAllPreviousDoors(pGo:GetInstanceID(), 1)
+      end
+   end
+end
+
+function PreUnitDie(e, pKiller, pUnit)
+   if (pUnit:IsCreature() and pUnit:GetEntry() >= nRevenant and pUnit:GetEntry() <= nWarrior) then
+      local tUnits = GetEvent1CreaturesWithEntries(pUnit, nRevenant, nHorror, nWretch, nSniper, nMarksman)
+      if (par.AreAllDead(tUnits)) then
+         local tWars = GetEvent1CreaturesWithEntries(pUnit, nWarrior)
+         if (tWars[1] and tWars[1]:GetUInt32Value(UNIT_FIELD_FLAGS) ~= 0 and tWars[2] and tWars[2]:GetUInt32Value(UNIT_FIELD_FLAGS) ~= 0) then
+            local v = tWars[1]
+            v:SetUInt32Value(UNIT_NPC_EMOTESTATE, 404)
+            local function wait3000(p)
+               p:SetUInt32Value(UNIT_FIELD_FLAGS, 0)
+               p:SetFaction(14)
+               p:SetCombatCapable(0)
+               p:AttackReaction(pKiller, 1, 0)
+            end
+            v:RegisterEvent(wait3000, 3000, 1)
+            v:RegisterEvent(function() War_30PctEvent(v, tWars[2]) end, 200, 0)
+         end
+      end
+      local tUnits = GetEvent1CreaturesWithEntries(pUnit, nRevenant, nHorror, nWretch, nSniper, nMarksman, nWarrior)
+      if (par.AreAllDead(tUnits)) then
+         par.HyperActivate(self[pUnit:GetInstanceID()].p2, true)
+         self[pUnit:GetInstanceID()].pBarrel:RemoveEvents()
+         self[pUnit:GetInstanceID()].status = 2
+         for k,v in pairs(tUnits) do
+            v:Despawn(180000, 0)
+         end
+      end
+   end
+end
+
+function WipeAction(id, pVic, pUnit)
+   if (self[id].status ~= 1) then return; end
+   local tUnits = GetEvent1CreaturesWithEntries(pUnit, nRevenant, nHorror, nWretch, nSniper, nMarksman, nWarrior)
+   for k,v in pairs(tUnits) do
+      v:Despawn(5, 5)
+   end
+   par.OpenAllPreviousDoors(id)
+   self[id].status = nil
+end
+
+function War_30PctEvent(pUnit, v) --v here = other warr.
+   if (pUnit:GetHealthPct() <= 30) then
+      v:SetUInt32Value(UNIT_NPC_EMOTESTATE, 404)
+      local function wait3000(p)
+         p:SetUInt32Value(UNIT_FIELD_FLAGS, 0)
+         p:SetFaction(14)
+         p:SetCombatCapable(0)
+         p:AttackReaction(p:GetClosestPlayer(), 1, 0)
+      end
+      v:RegisterEvent(wait3000, 3000, 1)
+      pUnit:RemoveEvents()
+   end
+end
+
+function OnSpawnSetUnattackable(pUnit)
+   pUnit:SetUInt32Value(UNIT_FIELD_FLAGS, UNIT_FLAG_NOT_ATTACKABLE_2)
+end
+
+RegisterGameObjectEvent(nDoorE, 1, Door_Spawn)
+RegisterGameObjectEvent(nLDoorE, 1, LDoor_Spawn)
+RegisterGameObjectEvent(nBarrelE, 1, Barrel_Spawn)
+RegisterServerHook(28, PreUnitDie)
+RegisterUnitEvent(nWarrior, 18, SetupBoneWarrior)
+RegisterWipeEvent(33, WipeAction)
+for i=nRevenant, nMarksman do --assuming these creature entries remain consecutive!
+   RegisterUnitEvent(i, 18, OnSpawnSetUnattackable)
+end

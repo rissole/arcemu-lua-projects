@@ -1,0 +1,19 @@
+--[[
+local minute
+local hour
+
+function monster_OnSpawn(unit, event)
+	local minutes = unit:GetGameTime()/60
+	local player = unit:GetClosestPlayer()
+	hour = math.floor(minutes/60)
+	minute = math.floor(minutes % 60)
+
+	if (hour<10) then hour="0"..hour end
+	if (minute<10) then minute="0"..minute end
+
+	unit:SendChatMessage(14,0,"Time in-game is "..hour..":"..minute)
+	unit:SendChatMessage(15,0,"Preview Item: \124cffff8000\124Hitem:13262:0:0:0:0:0:0:0:0\124h[Ashbringer]\124h\124r",player)
+end
+
+RegisterUnitEvent(24437, 18, "monster_OnSpawn")
+]]--
